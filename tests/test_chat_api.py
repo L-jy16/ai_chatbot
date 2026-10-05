@@ -11,10 +11,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Integer, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.routers.chat import create_router
 from app.services import llm
-from app.services.scenarios import q5
+from app.services.scenarios import q5, q6
 
 
 @pytest.fixture
@@ -51,10 +52,15 @@ def chat_app(monkeypatch):
             raise HTTPException(status_code=401)
         return SimpleNamespace(id=int(x_test_user))
 
-    calls = []
+    class Calls(list):
+        failure = None
+
+    calls = Calls()
 
     async def fake_llm(system, messages):
         calls.append((system, messages))
+        if calls.failure:
+            raise calls.failure
         return "추천 답변"
 
     async def fake_prompt(message):
@@ -62,6 +68,7 @@ def chat_app(monkeypatch):
 
     monkeypatch.setattr(llm, "ask_llm", fake_llm)
     monkeypatch.setattr(q5, "build_prompt", fake_prompt)
+    monkeypatch.setattr(q6, "build_prompt", fake_prompt)
     app = FastAPI()
     app.include_router(create_router(require_login, get_db))
     yield TestClient(app), Session, Chat, calls
@@ -118,3 +125,50 @@ def test_context_is_limited_to_current_user(chat_app):
     assert messages[0]["content"] == "질문 1"
     assert messages[-1]["content"] == "다음은?"
     assert all("다른 사람" not in item["content"] for item in messages)
+
+
+@pytest.mark.parametrize(
+    ("failure", "code", "saved_status", "http_status"),
+    [
+        (llm.AITimeoutError(), "AI_TIMEOUT", "timeout", 504),
+        (llm.AIServiceError(), "AI_ERROR", "error", 502),
+    ],
+)
+def test_ai_failure_is_saved_without_answer(chat_app, failure, code, saved_status, http_status):
+    client, Session, Chat, calls = chat_app
+    calls.failure = failure
+
+    response = client.post(
+        "/api/chat", json={"mode": "q6", "message": "다음 편"}, headers={"X-Test-User": "1"}
+    )
+
+    assert response.status_code == http_status
+    assert response.json()["error"] == code
+    with Session() as db:
+        row = db.query(Chat).one()
+        assert (row.status, row.answer) == (saved_status, None)
+
+
+def test_db_failure_never_returns_success(chat_app, monkeypatch):
+    client, Session, Chat, calls = chat_app
+    original_commit = Session.class_.commit
+
+    def fail_commit(self):
+        raise SQLAlchemyError("simulated DB write failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Session.class_, "commit", fail_commit)
+        response = client.post(
+            "/api/chat", json={"mode": "q5", "message": "질문"}, headers={"X-Test-User": "1"}
+        )
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "DB_ERROR"
+    with Session() as db:
+        assert db.query(Chat).count() == 0
+
+    assert Session.class_.commit is original_commit
+    next_response = client.post(
+        "/api/chat", json={"mode": "q5", "message": "다음 질문"}, headers={"X-Test-User": "1"}
+    )
+    assert next_response.status_code == 200
