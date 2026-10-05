@@ -1,7 +1,9 @@
 import os
 import logging
+from datetime import datetime, timedelta
 
 import requests
+
 
 
 logger = logging.getLogger(__name__)
@@ -100,3 +102,52 @@ def get_hot_issues(limit: int = 10) -> list[dict]:
     )
 
     return issues[:limit]
+
+def _request_datalab(
+    keyword: str,
+    start_date: str,
+    end_date: str,
+) -> list[dict]:
+    """네이버 데이터랩에서 검색어 추이를 조회합니다."""
+
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+        logger.warning("네이버 API 키가 설정되지 않았습니다.")
+        return []
+
+    body = {
+        "startDate": start_date,
+        "endDate": end_date,
+        "timeUnit": "date",
+        "keywordGroups": [
+            {
+                "groupName": keyword,
+                "keywords": [keyword],
+            }
+        ],
+    }
+
+    try:
+        response = requests.post(
+            NAVER_DATALAB_URL,
+            headers=_get_headers(),
+            json=body,
+            timeout=5,
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+        results = data.get("results", [])
+
+        if not results:
+            return []
+
+        return results[0].get("data", [])
+
+    except requests.RequestException as error:
+        logger.error(
+            "네이버 데이터랩 API 호출 실패: %s",
+            error,
+        )
+
+        return []
