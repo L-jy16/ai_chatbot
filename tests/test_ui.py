@@ -86,7 +86,7 @@ def test_db_failure_is_recoverable(logged_in, monkeypatch):
     assert '기록을 불러오지 못했습니다' in response.json()['detail']
 
 
-@pytest.mark.parametrize('mode', ['q1', 'q4', 'q5', 'q6'])
+@pytest.mark.parametrize('mode', ['q1', 'q2', 'q3', 'q4', 'q5'])
 def test_each_mode_saves_then_appears_in_history(logged_in, mode):
     response = logged_in.post('/api/chat', json={'mode': mode, 'message': '테스트 질문'})
     assert response.status_code == 200
@@ -99,7 +99,7 @@ def test_each_mode_saves_then_appears_in_history(logged_in, mode):
 
 @pytest.mark.parametrize('message,code,status', [('[timeout]', 'AI_TIMEOUT', 504), ('[error]', 'AI_ERROR', 502)])
 def test_failed_response_saved_with_null_answer_and_server_recovers(logged_in, message, code, status):
-    response = logged_in.post('/api/chat', json={'mode': 'q4', 'message': message})
+    response = logged_in.post('/api/chat', json={'mode': 'q3', 'message': message})
     assert response.status_code == status
     assert response.json()['error'] == code
     row = logged_in.get('/api/me/chats?limit=1').json()[0]
@@ -111,6 +111,24 @@ def test_failed_response_saved_with_null_answer_and_server_recovers(logged_in, m
 @pytest.mark.parametrize('message', ['', '  ', '가' * 501])
 def test_question_validation(logged_in, message):
     assert logged_in.post('/api/chat', json={'mode': 'q1', 'message': message}).status_code == 422
+
+
+def test_q2_asks_for_previous_upload_topics_when_missing(logged_in):
+    response = logged_in.post('/api/chat', json={'mode': 'q2', 'message': '운영 중인 채널에 뭘 올릴까?'})
+    assert response.status_code == 200
+    assert '과거에 어떤 주제로 올리셨나요?' in response.json()['answer']
+
+
+def test_q2_uses_previous_upload_topics_and_saves_context(logged_in):
+    message = '최근 업로드 주제: 환율 상승\n질문: 연결된 오늘의 주제를 추천해 줘.'
+    response = logged_in.post('/api/chat', json={'mode': 'q2', 'message': message})
+    assert response.status_code == 200
+    assert '과거 업로드 주제: 환율 상승' in response.json()['answer']
+    assert logged_in.get('/api/me/chats?limit=1').json()[0]['question'] == message
+
+
+def test_removed_q6_mode_rejected(logged_in):
+    assert logged_in.post('/api/chat', json={'mode': 'q6', 'message': '이전 번호'}).status_code == 422
 
 
 def test_logout_revokes_pages_and_api(logged_in):
@@ -159,8 +177,8 @@ def test_sql_script_is_user_scoped_and_latest_first(tmp_path):
         db.execute('CREATE TABLE chats (id INTEGER, user_id INTEGER, mode TEXT, created_at TEXT, question TEXT, answer TEXT, status TEXT)')
         db.executemany('INSERT INTO chats VALUES (?, ?, ?, ?, ?, ?, ?)', [
             (1, 1, 'q1', '2026-10-05T09:00:00', 'old', 'answer', 'success'),
-            (2, 1, 'q4', '2026-10-05T10:00:00', 'new', None, 'timeout'),
-            (3, 2, 'q5', '2026-10-05T11:00:00', 'private', 'answer', 'success'),
+            (2, 1, 'q3', '2026-10-05T10:00:00', 'new', None, 'timeout'),
+            (3, 2, 'q4', '2026-10-05T11:00:00', 'private', 'answer', 'success'),
         ])
     rows = read_logs(path, user_id=1, limit=1)
     assert len(rows) == 1 and rows[0]['id'] == 2

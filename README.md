@@ -11,7 +11,7 @@
 | 공통 템플릿·반응형 스타일 | `app/templates/base.html`, `app/static/css/style.css` |
 | 로그인·회원가입 | `login.html`, `signup.html`, `static/js/auth.js` |
 | 채팅·같은 화면 응답 | `chat.html`, `static/js/chat.js` |
-| Q1/Q4/Q5/Q6·예시 질문 | `static/js/modes.js` |
+| Q1~Q5·예시 질문 | `static/js/modes.js` |
 | 대기·오류·입력 검증 | 빈 값·500자 제한, 중복 전송 차단, 실패 시 입력 유지·재로그인 안내 |
 | 내 기록 API | `app/routers/logs.py`, 인증 사용자별 최신순 조회 |
 | 내 기록 화면 | `history.html`, `static/js/history.js` |
@@ -51,7 +51,7 @@ python3 -m venv .venv
 확인 순서:
 
 1. 회원가입 화면의 이메일·비밀번호 확인을 살펴봅니다. 실제 가입은 A 연결 후 검사합니다.
-2. 예시 계정으로 로그인하고 네 가지 모드를 선택해 질문합니다.
+2. 예시 계정으로 로그인하고 다섯 가지 모드를 선택해 질문합니다. Q2에서는 과거 업로드 주제를 먼저 입력합니다.
 3. 같은 화면에서 응답을 확인합니다.
 4. `[timeout]`, `[error]`를 질문으로 정확히 입력해 실패 안내·입력 유지·재시도를 확인합니다. 데모 전용 테스트 문자열입니다.
 5. 내 기록에서 질문·응답·시각·성공/실패 상태를 확인합니다.
@@ -105,6 +105,8 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 
 팀과 합의할 추가 계약:
 
+- 최신 mode는 q1~q5입니다. Q2에서는 최근 업로드 주제를 먼저 입력받아 `최근 업로드 주제: ...\n질문: ...` 형태의 message로 전달하며 전체 500자 제한을 검사합니다. 기존 q4/q5/q6 의미와 달라 C의 검증·분기도 함께 맞춰야 합니다. 기존 번호로 저장된 기록은 팀이 변환 범위를 확인합니다.
+
 - 로그인 시 A는 `request.session["user_id"]`에 양의 **정수 ID**를 저장하고 로그아웃 시 세션을 지웁니다.
 - `require_login`은 비로그인을 401로 차단하고 정수 ID·`User.id`·`{"id": 정수}` 중 하나를 반환합니다. 삭제된 사용자·만료 계정은 A에서 검사합니다.
 - `get_db()`는 **동기 SQLAlchemy Session**을 yield하고 닫습니다. AsyncSession은 현재 로그 라우터와 호환되지 않습니다.
@@ -131,7 +133,7 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 채팅 요청과 성공 응답:
 
 ```json
-{"mode": "q4", "message": "금리 인하 주제 지금 올려도 돼?"}
+{"mode": "q3", "message": "금리 인하 주제 지금 올려도 돼?"}
 ```
 
 ```json
@@ -152,7 +154,7 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 [
   {
     "id": 987,
-    "mode": "q4",
+    "mode": "q3",
     "question": "금리 인하 주제 지금 올려도 돼?",
     "answer": "트렌드 데이터와 함께 생성한 AI 응답",
     "status": "success",
@@ -189,7 +191,7 @@ erDiagram
     }
 ```
 
-`mode`: q1/q4/q5/q6/free. `status`: success/timeout/error. Q2는 Q1의 채널 맥락에 통합합니다.
+`mode`: q1/q2/q3/q4/q5/free. `status`: success/timeout/error. 사용자의 최신 정의에 따라 Q2는 운영 채널 전용 독립 모드입니다. 처리 순서와 번호 변경 계약은 [시나리오 문서](docs/SCENARIOS.md)에 있습니다.
 
 API 확인(Linux/macOS shell 예시):
 
@@ -230,7 +232,7 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 ./.venv/Scripts/python.exe -m pytest -q --basetemp tmp/test-runs/local
 ```
 
-**36개 테스트 통과.** 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 모드별 저장·조회, timeout/error 후 재시도, SQL 읽기 전용 검사를 확인했습니다. 현재 FastAPI/Starlette 조합에서 httpx 관련 deprecation warning 1건이 있으며 실패는 아닙니다.
+**40개 테스트 통과.** 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 다섯 모드 저장·조회, Q2 업로드 맥락·추가 질문, timeout/error 후 재시도, SQL 읽기 전용 검사를 확인했습니다. 현재 FastAPI/Starlette 조합에서 httpx 관련 deprecation warning 1건이 있으며 실패는 아닙니다.
 
 브라우저 검사(선택 사항, 별도 터미널에서 데모 실행):
 
@@ -243,7 +245,7 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 ./.venv/Scripts/python.exe dev/check_ui_browser.py
 ```
 
-인증 화면·네 모드 payload·timeout 입력 유지·응답 HTML 비실행·기록 빈/오류 상태·로그아웃·375px 모바일 가로 넘침을 검사합니다. 캡처는 `output/ui/`에 생성됩니다. 이번 검증은 Windows headless Chrome으로 통과했습니다. 실제 인증·네이버·LLM·영구 DB 검증은 팀 통합 후 필요합니다.
+인증 화면·다섯 모드 payload·Q2 업로드 주제와 총 길이 제한·timeout 입력 유지·응답 HTML 비실행·기록 빈/오류 상태·로그아웃·375px 모바일 가로 넘침을 검사합니다. 캡처는 `output/ui/`에 생성됩니다. 이번 검증은 Windows headless Chrome으로 통과했습니다. 실제 인증·네이버·LLM·영구 DB 검증은 팀 통합 후 필요합니다.
 
 ## 팀 역할·개인별 작업 요약
 
@@ -252,16 +254,16 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 | 역할 | 브랜치 | 계획 / 현재 상태 |
 | --- | --- | --- |
 | A | feature/auth | 기반, config, DB, User, 회원가입·세션 / 코드 대기 |
-| B | feature/trend | 네이버, 추이 비교, Q1·Q4 / 코드 대기 |
-| C | feature/chat | Chat, LLM, 컨텍스트, mode, 저장, Q5·Q6 / 코드 대기 |
-| D | feature/ui | 4개 화면·공통 스타일, 모드·오류·대기, 기록 API·SQL, 데모·테스트·통합 문서 완료. 배포 제외 |
+| B | feature/trend | 네이버, 추이 비교, Q1·Q3 데이터 / 코드 대기, Q2 연계는 팀 합의 |
+| C | feature/chat | Chat, LLM, 컨텍스트, mode, 저장, Q4·Q5 / 코드 대기, Q2 대화 흐름 추가 필요 |
+| D | feature/ui | 4개 화면·공통 스타일, 다섯 모드·Q2 업로드 맥락·오류·대기, 기록 API·SQL, 데모·테스트·통합 문서 완료. 배포 제외 |
 
 D의 변경은 `feature/ui`에 기능별 커밋으로 기록했습니다. `git log --oneline feature/ui`로 확인합니다. 팀 협업 계획은 `feature/* → develop → main`, PR 기반 merge commit, 팀원 1명 이상 승인입니다. 이 작업에서 GitHub push·PR 게시·merge·develop/main 변경은 하지 않았습니다. PR 설명 초안·분할안은 `docs/D_PR_DRAFTS.md`에 있습니다. 커밋 작성자와 제출 팀원은 실제 Git 설정·작업자 기준으로 확인하세요.
 
 ## 통합 후 남은 검증
 
 - 실제 회원가입·중복 가입·로그인·세션 종료 및 서버 입력 검증.
-- 네이버 추이와 실제 AI로 네 시나리오 응답·최근 N개 대화 컨텍스트 확인.
+- 네이버 추이와 실제 AI로 다섯 시나리오 응답·최근 N개 대화 컨텍스트 확인.
 - 성공·실패 로그를 실제 SQLite, API, 화면, SQL에서 사용자별로 대조.
 - 요청 수신 / AI 호출 / 응답·실패 / DB 저장 성공·실패 서버 로그 확인.
 - 환경 변수 이름·비밀번호 정책·timestamp 기준 합의.

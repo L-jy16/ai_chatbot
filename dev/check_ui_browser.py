@@ -30,14 +30,34 @@ def run(base_url: str, *, channel: str | None) -> None:
         expect(page).to_have_url(base_url + '/')
         page.screenshot(path=str(output / 'chat-desktop.png'), full_page=True)
 
-        for index, mode in enumerate(['q1', 'q4', 'q5', 'q6']):
+        for index, mode in enumerate(['q1', 'q2', 'q3', 'q4', 'q5']):
             page.locator(f'[data-mode="{mode}"]').click()
             expect(page.locator(f'[data-mode="{mode}"]')).to_have_attribute('aria-pressed', 'true')
+            if mode == 'q2':
+                expect(page.locator('#channel-context')).to_be_visible()
+                page.locator('#previous-topics').fill('   ')
+                page.locator('#message').fill('오늘의 주제를 추천해 줘.')
+                page.locator('#send-button').click()
+                expect(page.locator('#chat-error')).to_contain_text('최근 업로드 주제')
+                expect(page.locator('.message-assistant')).to_have_count(index)
+                page.locator('#previous-topics').fill('가' * 200)
+                page.locator('#message').fill('나' * 400)
+                page.locator('#send-button').click()
+                expect(page.locator('#chat-error')).to_contain_text('합친 전송 내용')
+                expect(page.locator('.message-assistant')).to_have_count(index)
+            else:
+                expect(page.locator('#channel-context')).to_be_hidden()
+                expect(page.locator('#previous-topics')).to_be_disabled()
             page.locator('#example-button').click()
             assert page.locator('#message').input_value()
             with page.expect_request('**/api/chat') as request:
                 page.locator('#send-button').click()
             assert request.value.post_data_json['mode'] == mode
+            if mode == 'q2':
+                payload = request.value.post_data_json
+                assert set(payload) == {'mode', 'message'}
+                assert payload['message'].startswith('최근 업로드 주제: AI 반도체 투자, 환율 상승\n질문: ')
+                expect(page.locator('.message-assistant').last).to_contain_text('과거 업로드 주제: AI 반도체 투자, 환율 상승')
             expect(page.locator('.message-assistant')).to_have_count(index + 1)
             expect(page.locator('#message')).to_have_value('')
 
@@ -80,13 +100,19 @@ def run(base_url: str, *, channel: str | None) -> None:
                 expect(page.locator('.history-record').first).to_be_visible()
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'horizontal overflow: {path}'
             page.screenshot(path=str(output / f'{name}.png'), full_page=True)
+        page.goto(base_url + '/')
+        page.locator('[data-mode="q2"]').click()
+        page.locator('#example-button').click()
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+        page.evaluate('window.scrollTo(0, 0)')
+        page.screenshot(path=str(output / 'q2-mobile.png'), full_page=True)
         page.locator('#logout-button').click()
         expect(page).to_have_url(base_url + '/login')
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         page.screenshot(path=str(output / 'login-mobile.png'), full_page=True)
         assert not errors, errors
         browser.close()
-    print('Browser checks passed: auth, four modes, timeout recovery, safe text, history states, mobile, logout.')
+    print('Browser checks passed: auth, five modes, Q2 context and total length, timeout recovery, safe text, history states, mobile, logout.')
 
 
 if __name__ == '__main__':

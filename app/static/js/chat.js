@@ -8,9 +8,17 @@ const errorBox = document.querySelector('#chat-error');
 const conversation = document.querySelector('#conversation');
 const waiting = document.querySelector('#waiting-status');
 const loginAgain = document.querySelector('#login-again');
+const topics = document.querySelector('#previous-topics');
 let mode = 'q1';
 
-export function chooseMode(value) { mode = value; }
+function requestMessage() {
+  const question = input.value.trim();
+  return mode === 'q2' && question ? `최근 업로드 주제: ${topics.value.trim()}\n질문: ${question}` : question;
+}
+function updateCount() {
+  document.querySelector('#char-count').textContent = `${requestMessage().length} / 500`;
+}
+export function chooseMode(value) { mode = value; updateCount(); }
 const modes = setupModes(chooseMode);
 
 function appendMessage(kind, text) {
@@ -29,9 +37,8 @@ function appendMessage(kind, text) {
   return article;
 }
 
-input.addEventListener('input', () => {
-  document.querySelector('#char-count').textContent = `${input.value.length} / 500`;
-});
+input.addEventListener('input', updateCount);
+topics.addEventListener('input', updateCount);
 input.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
@@ -41,9 +48,14 @@ input.addEventListener('keydown', (event) => {
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (send.disabled) return;
-  const message = input.value.trim();
+  if (mode === 'q2' && !topics.value.trim()) {
+    showError(errorBox, '과거에 어떤 주제로 올리셨나요? 최근 업로드 주제를 먼저 입력해 주세요.');
+    topics.focus();
+    return;
+  }
+  const message = requestMessage();
   if (!message || message.length > 500) {
-    showError(errorBox, '질문은 공백을 제외하고 1~500자로 입력해 주세요.');
+    showError(errorBox, mode === 'q2' ? '업로드 주제와 질문을 합친 전송 내용은 1~500자로 입력해 주세요.' : '질문은 1~500자로 입력해 주세요.');
     input.focus();
     return;
   }
