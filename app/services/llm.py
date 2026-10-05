@@ -1,7 +1,5 @@
 """A single server-side call to Codyssey's OpenAI-compatible chat endpoint."""
 
-import os
-
 import httpx
 
 
@@ -15,18 +13,19 @@ class AIServiceError(Exception):
 
 async def ask_llm(system: str, messages: list[dict]) -> str:
     """Send one request. Never expose the provider key to the browser."""
-    key = os.getenv("AI_API_KEY")
-    if not key:
-        raise AIServiceError("AI_API_KEY is not configured")
+    from app.config import settings
 
-    base_url = os.getenv("AI_BASE_URL", "https://copa.codyssey.kr/v1").rstrip("/")
-    model = os.getenv("AI_MODEL", "gpt-5-mini")
+    key = settings.LLM_API_KEY.strip()
+    if not key:
+        raise AIServiceError("LLM_API_KEY is not configured")
+
+    model = settings.LLM_MODEL.strip() or "gpt-5-mini"
     try:
-        timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
+        timeout = float(settings.LLM_TIMEOUT_SECONDS)
         if timeout <= 0:
             raise ValueError
     except ValueError as exc:
-        raise AIServiceError("AI_TIMEOUT_SECONDS must be positive") from exc
+        raise AIServiceError("LLM_TIMEOUT_SECONDS must be positive") from exc
     payload = {
         "model": model,
         "messages": [{"role": "system", "content": system}, *messages],
@@ -36,7 +35,7 @@ async def ask_llm(system: str, messages: list[dict]) -> str:
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                f"{base_url}/chat/completions",
+                "https://copa.codyssey.kr/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
                 json=payload,
             )

@@ -198,7 +198,7 @@ Q5·Q6 프롬프트, 입력·문맥 규칙, LLM 클라이언트와 C API는 구�
 
 제공 PDF 1~3쪽에 `https://copa.codyssey.kr/v1/chat/completions`와 `Authorization: Bearer <virtual-key>`가 명시돼 있다. `gpt-5-mini`는 이 주소의 예제 모델이며 차감 배수가 0.5다. 따라서 서버에서 호출할 수 있는 API 형식은 확인됐다. 화면의 활성 키 1개와 잔여 100만 토큰은 **PDF 캡처 시점의 상태**다. 실호출 성공이나 현재 잔여량까지 입증하지는 않는다.
 
-C는 `AI_API_KEY`를 기존 `.env.example`의 이름대로 사용한다. URL·모델·타임아웃은 코드에 안전한 기본값이 있으며 필요할 때만 `AI_BASE_URL`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`로 바꿀 수 있다. A의 설정 파일에 필드를 추가할 필요는 없다. 실제 키만 `.env`/배포 환경에 둔다. 코디세이 호출은 제공 PDF의 `/v1/chat/completions` 예제를 따르고, 과제의 기존 `ask_llm(system, messages)` 인터페이스를 유지한다. 실제 응답 형식은 첫 실호출로 확인한다.
+C는 A의 `app.config.settings`가 `.env`에서 읽는 `LLM_API_KEY`, `LLM_MODEL`, `LLM_TIMEOUT_SECONDS`를 그대로 사용한다. URL은 코디세이 제공 PDF의 `/v1/chat/completions` 주소로 고정해 불필요한 설정을 늘리지 않는다. 모델이 비어 있으면 `gpt-5-mini`, 타임아웃은 A의 기본값 30초다. 실제 키만 로컬 `.env`/배포 환경에 둔다. 기존 `ask_llm(system, messages)` 인터페이스를 유지하고 실제 응답 형식은 첫 실호출로 확인한다.
 
 ### 현재 통합 계약
 

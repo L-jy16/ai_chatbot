@@ -1,10 +1,24 @@
 import asyncio
 import json
+import sys
+import types
+from types import SimpleNamespace
 
 import httpx
 import pytest
 
 from app.services.llm import AIServiceError, AITimeoutError, ask_llm
+
+
+@pytest.fixture(autouse=True)
+def config_settings(monkeypatch):
+    """A's settings contract, supplied only inside the test."""
+    module = types.ModuleType("app.config")
+    module.settings = SimpleNamespace(
+        LLM_API_KEY="test-only", LLM_MODEL="", LLM_TIMEOUT_SECONDS=30
+    )
+    monkeypatch.setitem(sys.modules, "app.config", module)
+    return module.settings
 
 
 def test_llm_sends_one_server_side_request(monkeypatch):
@@ -17,7 +31,6 @@ def test_llm_sends_one_server_side_request(monkeypatch):
     transport = httpx.MockTransport(respond)
     original = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs))
-    monkeypatch.setenv("AI_API_KEY", "test-only")
 
     answer = asyncio.run(ask_llm("시스템", [{"role": "user", "content": "질문"}]))
 
@@ -47,7 +60,6 @@ def test_llm_failure_is_normalized_without_retry(monkeypatch, response, expected
 
     original = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs))
-    monkeypatch.setenv("AI_API_KEY", "test-only")
 
     with pytest.raises(AIServiceError, match=expected):
         asyncio.run(ask_llm("system", [{"role": "user", "content": "question"}]))
@@ -60,13 +72,12 @@ def test_llm_timeout_has_dedicated_error(monkeypatch):
 
     original = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs))
-    monkeypatch.setenv("AI_API_KEY", "test-only")
 
     with pytest.raises(AITimeoutError):
         asyncio.run(ask_llm("system", [{"role": "user", "content": "question"}]))
 
 
-def test_llm_does_not_call_api_without_key(monkeypatch):
-    monkeypatch.delenv("AI_API_KEY", raising=False)
+def test_llm_does_not_call_api_without_key(config_settings):
+    config_settings.LLM_API_KEY = ""
     with pytest.raises(AIServiceError, match="not configured"):
         asyncio.run(ask_llm("system", []))

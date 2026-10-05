@@ -13,7 +13,7 @@
 1. 실제 작업 저장소가 `/Users/jihwanjeong/Developer/cds-ai-chatbot`인지 확인한다. ChatGPT 미러의 sources는 읽기 전용이다.
 2. 적용되는 AGENTS.md, C_PLAN.md, MISSION.md, 팀 PDF, 현재 코드·Git 상태를 읽는다. 사용자 변경을 덮어쓰지 않는다.
 3. GitHub 팀 저장소는 `L-jy16/ai_chatbot`이고 C 브랜치는 `feature/chat`이다. A의 `feature/auth` 구현이 develop에 들어왔는지 확인한다.
-4. A의 인증·DB 계약을 확인한다. LLM 제공자·모델은 위의 코디세이 `gpt-5-mini`로 정했다. 이미 답한 사항은 다시 묻지 않는다. 비밀 키의 실제 값을 대화로 요청하지 않는다. 필수 환경 변수는 기존 `AI_API_KEY` 하나이며 URL·모델·타임아웃 변경용 변수는 선택 사항이다.
+4. A의 인증·DB 계약을 확인한다. LLM 제공자·모델은 위의 코디세이 `gpt-5-mini`로 정했다. 이미 답한 사항은 다시 묻지 않는다. 비밀 키의 실제 값을 대화로 요청하지 않는다. A가 정의한 `LLM_API_KEY`, `LLM_MODEL`, `LLM_TIMEOUT_SECONDS`를 사용한다. 로컬 `.env`는 Git에서 제외한다.
 5. C_PLAN의 ‘제안’은 팀 확정 사항이 아니다. 기존 코드/팀 합의가 있으면 그것에 맞추고 달라진 사항을 기록한다.
 
 ## 허용 범위
