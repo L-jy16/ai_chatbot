@@ -182,15 +182,15 @@ DB 읽기 전용 검사:
 
 SQLite CLI 예시는 `scripts/check_logs.sql`을 참고하세요. 존재하지 않는 DB는 새로 만들지 않습니다.
 
-## 역할과 협업
+## 팀 구성원 역할과 개인별 작업 요약
 
-| 역할 | 브랜치 | 담당 |
-| --- | --- | --- |
-| A | feature/auth | 프로젝트 기반, User·세션 인증, 보안·검증 |
-| B | feature/trend | 뉴스·검색 추이, 시나리오 데이터 |
-| C | feature/chat | Chat·LLM·컨텍스트·분기·저장 |
-| D | feature/ui | PULSE 화면·기록 조회·SQL·데모·문서 |
+| 역할 | GitHub (커밋 작성자 이름) | 브랜치 · PR | 개인별 작업 요약 |
+| --- | --- | --- | --- |
+| A | rlawnsxo8709 | `feature/auth` (#2), 통합 커밋 (#3) | FastAPI 골격(설정·SQLite 연결·공통 에러 형식·로깅), User 모델과 bcrypt 해싱, 회원가입·로그인·로그아웃(세션 쿠키), `require_login`·`get_current_user` 의존성, 가입 입력 검증과 보안 보강(72바이트 비밀번호, 유니코드 이메일 정규화, 로그 마스킹), 인증 테스트와 공용 테스트 fixture. 통합: 화면 Q1~Q5와 시나리오 연결, LLM 응답 토큰·타임아웃 조정, 배포 가이드·README |
+| B | L-jy16 | `feature/trend` (#5) | 네이버 API 클라이언트, 뉴스 검색·오늘의 경제 이슈, 데이터랩 검색 추이 조회·최근/과거 비교·상승/하락 판정, Q1 오늘의 주제·Q2 운영 채널 추천·Q3 타이밍 체크 프롬프트, 인증·트렌드·AI·D 화면 1차 연결 |
+| C | cds-jihwan (Jipang) | `feature/chat` (#3) | 코디세이 LLM 클라이언트(타임아웃·오류 처리), Chat 모델, `POST /api/chat`(입력 검증·최근 5쌍 문맥·모드 분기), 요청·AI·DB 이벤트 로깅, AI 실패 기록과 DB 롤백, Q4 새로운 각도·Q5 다음 편 프롬프트(`scenarios/q5.py`·`q6.py`), 채팅 API 테스트 |
+| D | Kfri-cloud (Kfri) | `feature/ui` (#4) | 공통 템플릿·반응형 스타일, 로그인·회원가입·채팅·내 기록 화면, 모드 선택·예시 질문, 대기·오류·세션 만료 안내, 사용자별 기록 API `GET /api/me/chats`, DB 확인 SQL·스크립트, 독립 데모 앱, 브라우저 검사 |
 
-이번 feature/trend 통합에서는 A·B 연결에 필요했던 C 영역의 기본 구현을 최신 다섯 모드로 확장하고 D UI를 연결했습니다. 이후 C 브랜치와 합칠 때 Chat·LLM·채팅 라우터의 중복 구현을 확인하세요.
+**통합 과정**: B의 PR #5가 인증·트렌드·AI·D 화면을 처음 연결했습니다. 이후 C의 PR #3에서 채팅 라우터·Chat 모델·LLM 클라이언트를 C의 구현을 기준으로 하나로 합치고, 화면 Q1~Q5 번호와 담당 시나리오를 맞췄습니다(대응표: [docs/SCENARIOS.md](docs/SCENARIOS.md)).
 
-팀 정책은 feature/* → develop → main, PR 리뷰 후 merge commit입니다. 배포와 실제 API 데이터·응답 품질 검증은 별도이며, 로컬 테스트 성공만으로 완료 표시하지 않습니다.
+팀 정책은 feature/* → develop → main, PR 리뷰 후 merge commit입니다. 로컬 테스트 성공만으로 완료 표시하지 않고, 실제 API 응답과 배포 후 외부 접속을 따로 확인합니다.
