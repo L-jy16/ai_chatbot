@@ -12,6 +12,7 @@ def test_q5_uses_only_a_few_titles_and_requires_five_angles():
     assert "가장 적합한 1개" in prompt
     assert "이슈 4" in prompt
     assert "이슈 5" not in prompt
+    assert "금리 인하가 너무 흔해" not in prompt
 
 
 def test_q5_does_not_claim_live_trend_without_evidence():
@@ -28,3 +29,4 @@ def test_q6_requires_previous_topic_and_three_connected_episodes():
     assert "1편→2편→3편" in prompt
     assert "오늘 올릴 편 1개" in prompt
     assert "금리 결정 발표" in prompt
+    assert "어제 영상 다음 편은?" not in prompt
