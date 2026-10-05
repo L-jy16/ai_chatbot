@@ -1,4 +1,8 @@
+import httpx
+
+from app.config import settings
 from app.models import User
+from app.services import llm
 
 
 def test_real_auth_pages_and_static_assets_are_registered(client):
@@ -41,18 +45,39 @@ def test_deleted_user_cannot_access_private_pages(logged_in_client, db_session):
     assert logged_in_client.get('/api/me/chats').status_code == 401
 
 
-def test_pending_apis_still_require_real_login(client):
+def test_chat_apis_require_real_login(client):
     assert client.post('/api/chat', json={'mode': 'q1', 'message': '질문'}).status_code == 401
     assert client.get('/api/me/chats').status_code == 401
 
 
-def test_missing_chat_backend_is_explicit_not_mock(logged_in_client):
-    chat = logged_in_client.post('/api/chat', json={'mode': 'q1', 'message': '질문'})
-    assert chat.status_code == 503
-    assert chat.json()['error'] == 'CHAT_NOT_READY'
+def test_real_chat_failure_is_saved_and_visible_in_history(logged_in_client):
+    # 테스트 설정에서 LLM_API_KEY가 비어 있으므로 외부 API를 호출하지 않는다.
+    chat = logged_in_client.post('/api/chat', json={'mode': 'free', 'message': '질문'})
+    assert chat.status_code == 502
+    assert chat.json()['error'] == 'AI_ERROR'
     history = logged_in_client.get('/api/me/chats')
-    assert history.status_code == 503
-    assert history.json()['error'] == 'HISTORY_NOT_READY'
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]['question'] == '질문'
+    assert history.json()[0]['status'] == 'error'
     page = logged_in_client.get('/')
-    assert '채팅과 대화 기록 기능은 준비 중' in page.text
-    assert 'id="send-button" class="button" type="submit" disabled' in page.text
+    assert 'id="send-button" class="button" type="submit" disabled' not in page.text
+
+
+def test_real_chat_answer_is_visible_in_history_without_external_call(logged_in_client, monkeypatch):
+    monkeypatch.setattr(settings, 'LLM_API_KEY', 'test-only')
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json={'choices': [{'message': {'content': '추천 답변'}}]})
+    )
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(llm.httpx, 'AsyncClient', lambda **kwargs: original_client(transport=transport, **kwargs))
+
+    chat = logged_in_client.post('/api/chat', json={'mode': 'free', 'message': '금리 질문'})
+    assert chat.status_code == 200
+    assert chat.json()['answer'] == '추천 답변'
+    history = logged_in_client.get('/api/me/chats').json()
+    assert len(history) == 1
+    assert history[0]['id'] == chat.json()['chat_id']
+    assert history[0]['question'] == '금리 질문'
+    assert history[0]['answer'] == '추천 답변'
+    assert history[0]['status'] == 'success'

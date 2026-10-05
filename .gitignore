@@ -27,3 +27,6 @@ pytest-cache-files-*/
 .DS_Store
 .idea/
 .vscode/
+
+# 개인 에이전트 파일
+docs/PROGRESS.md

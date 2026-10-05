@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.routers.chat import create_router
+from app.errors import register_error_handlers
 from app.services import llm
 from app.services.scenarios import q5, q6
 
@@ -70,6 +71,7 @@ def chat_app(monkeypatch):
     monkeypatch.setattr(q5, "build_prompt", fake_prompt)
     monkeypatch.setattr(q6, "build_prompt", fake_prompt)
     app = FastAPI()
+    register_error_handlers(app)
     app.include_router(create_router(require_login, get_db))
     yield TestClient(app), Session, Chat, calls
     sys.modules.pop("app.models.chat", None)

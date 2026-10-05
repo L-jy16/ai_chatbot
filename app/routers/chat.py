@@ -6,7 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import Protocol
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import SQLAlchemyError
@@ -73,16 +73,8 @@ def create_router(require_login, get_db) -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/chat")
-    async def post_chat(request: Request, user=Depends(require_login), db: Session = Depends(get_db)):
+    async def post_chat(body: ChatRequest, user=Depends(require_login), db: Session = Depends(get_db)):
         logger.info("request_received user_id=%s", user.id)
-        try:
-            body = ChatRequest.model_validate(await request.json())
-        except (ValueError, TypeError):
-            return JSONResponse(
-                status_code=422,
-                content={"error": "INVALID_INPUT", "message": "질문은 1~500자로 입력해 주세요."},
-            )
-
         previous = (
             db.query(Chat)
             .filter(Chat.user_id == user.id, Chat.status == "success", Chat.answer.is_not(None))
