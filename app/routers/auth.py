@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import require_login
-from app.errors import APIError
+from app.errors import DEFAULT_INVALID_INPUT_MESSAGE, APIError
 from app.models import User
 from app.security import MAX_PASSWORD_BYTES, hash_password, verify_password
 
@@ -18,11 +18,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 PASSWORD_MIN_LENGTH = 8
+INVALID_EMAIL_MESSAGE = "올바른 이메일 형식이 아니에요."
+INVALID_PASSWORD_MESSAGE = "비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요."
 
 
 def normalize_email(value: str) -> str:
     """대소문자·앞뒤 공백이 달라도 같은 계정으로 보도록 이메일을 정규화한다."""
     return value.strip().lower()
+
+
+def ensure_utf8(value: str, message: str) -> str:
+    """짝 없는 서로게이트처럼 UTF-8로 바꿀 수 없는 문자가 있으면 message로 거절한다."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(message) from None
+    return value
 
 
 class SignupRequest(BaseModel):
@@ -32,20 +43,21 @@ class SignupRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def email_must_be_valid(cls, value: str) -> str:
-        email = normalize_email(value)
+        email = normalize_email(ensure_utf8(value, INVALID_EMAIL_MESSAGE))
         try:
             validate_email(email, check_deliverability=False)
         except EmailNotValidError:
-            raise ValueError("올바른 이메일 형식이 아니에요.") from None
+            raise ValueError(INVALID_EMAIL_MESSAGE) from None
         return email
 
     @field_validator("password")
     @classmethod
     def password_length_must_fit(cls, value: str) -> str:
+        ensure_utf8(value, INVALID_PASSWORD_MESSAGE)
         too_short = len(value) < PASSWORD_MIN_LENGTH
         too_long = len(value.encode("utf-8")) > MAX_PASSWORD_BYTES
         if too_short or too_long:
-            raise ValueError("비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요.")
+            raise ValueError(INVALID_PASSWORD_MESSAGE)
         return value
 
 
@@ -59,7 +71,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def email_not_blank(cls, value: str) -> str:
-        email = normalize_email(value)
+        email = normalize_email(ensure_utf8(value, DEFAULT_INVALID_INPUT_MESSAGE))
         if not email:
             raise ValueError(LOGIN_BLANK_MESSAGE)
         return email
@@ -69,7 +81,7 @@ class LoginRequest(BaseModel):
     def password_not_empty(cls, value: str) -> str:
         if not value:
             raise ValueError(LOGIN_BLANK_MESSAGE)
-        return value
+        return ensure_utf8(value, DEFAULT_INVALID_INPUT_MESSAGE)
 
 
 class UserResponse(BaseModel):

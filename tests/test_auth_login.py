@@ -53,3 +53,18 @@ def test_login_rejects_blank_fields(client, payload):
     response = client.post("/api/auth/login", json=payload)
     assert response.status_code == 422
     assert response.json() == BLANK_INPUT
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"email": "creator@example.com", "password": "abcdefgh\\ud800"}',
+        b'{"email": "a\\ud800@example.com", "password": "shorts1234"}',
+    ],
+)
+def test_login_rejects_unpaired_surrogate_without_500(signup, client, raw):
+    # 브라우저 JSON.stringify처럼 짝 없는 서로게이트를 \ud800 이스케이프로 보낸다.
+    signup()
+    response = client.post("/api/auth/login", content=raw, headers={"content-type": "application/json"})
+    assert response.status_code == 422
+    assert response.json() == {"error": "INVALID_INPUT", "message": "입력값이 올바르지 않아요."}

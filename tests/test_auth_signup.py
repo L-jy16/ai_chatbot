@@ -68,3 +68,22 @@ def test_signup_rejects_bad_password_length(signup, password):
 @pytest.mark.parametrize("password", ["a" * 8, "a" * 72, "가나다라마바사아"])  # 경계값, 한글 8자(24바이트)
 def test_signup_accepts_password_within_limits(signup, password):
     assert signup(password=password).status_code == 201
+
+
+def post_json_text(client, path, raw):
+    # 브라우저 JSON.stringify처럼 짝 없는 서로게이트를 \ud800 이스케이프로 보낸다.
+    return client.post(path, content=raw, headers={"content-type": "application/json"})
+
+
+def test_signup_rejects_unpaired_surrogate_in_password(client):
+    raw = b'{"email": "creator@example.com", "password": "abcdefgh\\ud800"}'
+    response = post_json_text(client, "/api/auth/signup", raw)
+    assert response.status_code == 422
+    assert response.json() == INVALID_PASSWORD
+
+
+def test_signup_rejects_unpaired_surrogate_in_email(client):
+    raw = b'{"email": "a\\ud800@example.com", "password": "shorts1234"}'
+    response = post_json_text(client, "/api/auth/signup", raw)
+    assert response.status_code == 422
+    assert response.json() == INVALID_EMAIL
