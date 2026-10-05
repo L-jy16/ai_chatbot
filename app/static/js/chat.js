@@ -1,4 +1,5 @@
 import {apiRequest, showError} from './common.js';
+import {setupModes} from './modes.js';
 
 const form = document.querySelector('#chat-form');
 const input = document.querySelector('#message');
@@ -8,6 +9,7 @@ const conversation = document.querySelector('#conversation');
 let mode = 'q1';
 
 export function chooseMode(value) { mode = value; }
+const modes = setupModes(chooseMode);
 
 function appendMessage(kind, text) {
   document.querySelector('#welcome')?.remove();
@@ -46,6 +48,7 @@ form.addEventListener('submit', async (event) => {
   showError(errorBox, '');
   send.disabled = true;
   input.disabled = true;
+  modes.setBusy(true);
   const pendingQuestion = appendMessage('user', message);
   try {
     const data = await apiRequest('/api/chat', {method: 'POST', body: {mode, message}});
@@ -59,6 +62,7 @@ form.addEventListener('submit', async (event) => {
   } finally {
     send.disabled = false;
     input.disabled = false;
+    modes.setBusy(false);
     input.focus();
   }
 });

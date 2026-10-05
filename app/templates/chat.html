@@ -12,7 +12,7 @@
       <div id="welcome" class="welcome"><div class="assistant-mark" aria-hidden="true">↗</div><h3>다음 콘텐츠의 시작, 여기서.</h3><p class="muted">궁금한 경제 이슈나 어제 올린 영상의 주제를 알려주세요.<br>질문에 맞는 콘텐츠 방향을 함께 정리해 드릴게요.</p></div>
     </div>
     <form id="chat-form" class="composer">
-      <label for="message">어떤 주제가 궁금한가요?</label>
+      <label for="message">어떤 주제가 궁금한가요? <span id="selected-mode" class="selected-mode">오늘의 주제</span></label>
       <textarea id="message" name="message" rows="3" required maxlength="500" placeholder="예: 금리 인하 주제, 지금 올려도 괜찮을까?" aria-describedby="composer-help char-count"></textarea>
       <p id="chat-error" class="error-message" role="alert" hidden></p>
       <div class="composer-bottom"><span id="composer-help" class="tiny muted">Enter로 전송 · Shift+Enter로 줄바꿈</span><div><span id="char-count" class="tiny muted">0 / 500</span><button id="send-button" class="button" type="submit">질문 보내기 <span aria-hidden="true">↗</span></button></div></div>
@@ -20,7 +20,16 @@
     <p class="disclaimer">AI의 답변은 참고 자료입니다. 게시 전 원문 출처와 사실을 직접 확인해 주세요.</p>
   </section>
   <aside class="tools-column">
-    {% block mode_selector %}<div id="mode-picker"></div>{% endblock %}
+    <section class="mode-panel" aria-labelledby="mode-heading">
+      <div class="section-heading"><h2 id="mode-heading">무엇을 도와드릴까요?</h2><span class="tiny muted">4 MODES</span></div>
+      <div class="mode-picker" role="group" aria-label="질문 모드 선택">
+        <button type="button" data-mode="q1" aria-pressed="true"><span class="mode-symbol" aria-hidden="true">✳</span><span><strong>오늘의 주제</strong><small>뜨는 이슈에서 다음 콘텐츠 찾기</small></span><span class="mode-number">Q1</span></button>
+        <button type="button" data-mode="q4" aria-pressed="false"><span class="mode-symbol" aria-hidden="true">◷</span><span><strong>타이밍 체크</strong><small>지금 올릴까, 조금 기다릴까?</small></span><span class="mode-number">Q4</span></button>
+        <button type="button" data-mode="q5" aria-pressed="false"><span class="mode-symbol" aria-hidden="true">◇</span><span><strong>새로운 각도</strong><small>익숙한 주제에 나만의 관점 더하기</small></span><span class="mode-number">Q5</span></button>
+        <button type="button" data-mode="q6" aria-pressed="false"><span class="mode-symbol" aria-hidden="true">⇢</span><span><strong>다음 편 기획</strong><small>한 편의 이야기를 시리즈로 잇기</small></span><span class="mode-number">Q6</span></button>
+      </div>
+      <button id="example-button" class="example-button" type="button">선택한 모드의 예시 질문 넣기 ↗</button>
+    </section>
     <div class="workflow-note"><p class="eyebrow">A BETTER QUESTION</p><h3>맥락을 더하면,<br>아이디어도 더 선명해져요.</h3><p>최근 업로드 주제, 시청자, 원하는 영상 길이를 질문에 함께 적어보세요.</p><div class="workflow-line"><span>이슈</span><span aria-hidden="true">→</span><span>관점</span><span aria-hidden="true">→</span><span>숏폼</span></div></div>
   </aside>
 </div>
