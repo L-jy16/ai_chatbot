@@ -85,6 +85,7 @@ def my_chats(db: Session = Depends(get_db)): ...
 - SQLite 연결 시 `check_same_thread=False`, `PRAGMA foreign_keys=ON`을 적용한다.
 - 테이블은 앱 시작 시 `Base.metadata.create_all()`로 만든다. 새 모델은 반드시 `app/models/__init__.py`에 import를 추가해야 생성 대상이 된다.
 - 시각 컬럼은 DB 기본값 `CURRENT_TIMESTAMP`(UTC)를 사용한다. `chats.created_at`도 같은 기준을 권장한다.
+- SQLite는 기본적으로 삭제된 마지막 id를 재사용하므로, 모델에 `__table_args__ = {"sqlite_autoincrement": True}`를 둔다. `users`는 적용되어 있고 `chats`도 같은 설정을 권장한다.
 
 ### 3.3 인증 의존성 — `app/dependencies.py`
 
@@ -198,7 +199,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 
 | 필드 | 타입 | 제약 | 설명 |
 |---|---|---|---|
-| `id` | INTEGER | PK | 사용자 식별 |
+| `id` | INTEGER | PK, AUTOINCREMENT | 사용자 식별 (삭제된 id는 재사용하지 않음) |
 | `email` | VARCHAR(255) | UNIQUE, INDEX, NOT NULL | 로그인 ID (소문자 정규화) |
 | `password_hash` | VARCHAR(60) | NOT NULL | bcrypt 해시 (`$2b$12$...`, 60자) |
 | `created_at` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 가입 시각 (UTC) |

@@ -59,3 +59,16 @@ def test_passwords_never_appear_in_logs(signup, login, caplog):
     assert "secret-pass-123" not in caplog.text
     assert "wrong-pass-456" not in caplog.text
     assert "$2b$" not in caplog.text
+
+
+def test_deleted_users_session_does_not_become_next_signup(logged_in_client, signup, db_session):
+    user = db_session.scalar(select(User).where(User.email == "creator@example.com"))
+    db_session.delete(user)
+    db_session.commit()
+
+    # SQLite가 지운 id를 새 가입자에게 재사용하면, 옛 쿠키가 그 사람으로 로그인된다.
+    signup(email="newcomer@example.com")
+
+    response = logged_in_client.post("/api/auth/logout")
+    assert response.status_code == 401
+    assert response.json() == LOGIN_REQUIRED
