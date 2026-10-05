@@ -4,15 +4,15 @@
 
 ## 현재 통합 상태
 
-A의 인증·SQLite, B의 트렌드, C의 채팅·AI, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 C의 다섯 모드가 채팅·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
+A의 인증·SQLite, B의 트렌드, C의 채팅·AI, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 다섯 모드 모두 C의 채팅 라우터에서 서버 프롬프트·LLM·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
 
 | 모드 | 기능 |
 | --- | --- |
 | Q1 | 오늘의 주제: 최신 경제 뉴스와 최근/이전 검색 추이, 추천 주제·내용 |
-| Q4 | 타이밍 체크: B의 검색 관심도·뉴스를 비교해 지금/기다리기/다른 각도 제안 |
-| Q5 | 새로운 각도: 반전·비교·논쟁·정보·경험형의 5~10개 아이디어와 최종 추천 |
-| Q6 | 다음 편 기획: 이전 주제에서 이어지는 1→2→3편 구조와 오늘의 다음 편 |
-| free | 경제 숏폼 관련 자유 질문. 최신 자료가 없으면 그 한계를 안내 |
+| Q2 | 운영 채널 추천: 과거 업로드 주제 확보 후 관련 자료와 연결 주제 추천 |
+| Q3 | 타이밍 체크: 주제의 검색 관심도를 비교해 지금/기다리기/다른 각도 제안 |
+| Q4 | 새로운 각도: 반전·비교·논쟁·정보·경험형의 5~10개 아이디어와 최종 추천 |
+| Q5 | 다음 편 기획: 이전 주제에서 파생한 후보, 1→2→3편 구조와 오늘의 다음 편 |
 
 뉴스는 최신순 일부 검색 결과이며 인기 순위나 전체 언급량이 아닙니다. 데이터가 없거나 조회에 실패하면 실시간 사실을 지어내지 않고 한계를 알리도록 프롬프트에 명시합니다. 실제 답변 품질과 키 권한은 별도 실서비스 확인이 필요합니다. 배포·외부 접속 설정은 포함하지 않습니다.
 
@@ -36,7 +36,7 @@ Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.ex
 
 1. `http://127.0.0.1:8000/signup`에서 회원가입합니다.
 2. `/login`에서 로그인합니다.
-3. `/`에서 Q1·Q4·Q5·Q6·자유 질문 중 하나를 선택해 질문합니다. Q6에는 이전 업로드 주제를 함께 입력할 수 있습니다.
+3. `/`에서 Q1~Q5 중 하나를 선택해 질문합니다. Q2는 과거 업로드 주제를 먼저 입력합니다.
 4. `/history`에서 사용자별 성공·실패 기록을 확인합니다.
 
 상태 확인: `/health`. API 문서: `/docs`. `.env`를 바꾸면 서버를 재시작합니다. 서버는 기본 `app.db`에 users·chats 테이블을 생성합니다.
@@ -52,7 +52,7 @@ Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.ex
 | `LLM_API_KEY` | Codyssey에서 발급한 AI 키 |
 | `LLM_BASE_URL` | `https://copa.codyssey.kr/v1` |
 | `LLM_MODEL` | `.env.example`은 `gpt-5-mini`, 사용 계정의 허용 모델 지정 |
-| `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 30초 |
+| `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 50초 (gpt-5-mini 추론 응답이 30초를 넘을 수 있어 늘림, 브라우저 제한 65초보다 짧게 유지) |
 
 사진의 Claude Code 설정 파일을 이 앱에서 읽지는 않습니다. 프로젝트 `.env`를 사용합니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
 
@@ -68,13 +68,13 @@ app/
 ├── routers/auth.py, chat.py             # 인증·AI 요청
 ├── routers/pages.py, logs.py            # D 페이지·기록 조회
 ├── services/trend.py, llm.py            # 네이버·AI
-├── services/scenarios/q1.py, q3.py, q5.py, q6.py  # 사용 중인 시나리오 프롬프트
+├── services/scenarios/                  # 모드별 프롬프트 (모드↔파일 대응: docs/SCENARIOS.md)
 ├── ui.py                               # 페이지·static·기록 라우터 등록
 ├── templates/                          # D Jinja2 템플릿
 └── static/css/, static/js/              # D UI
 ```
 
-`main.py`는 A 인증 라우터와 C의 `create_router(require_login, get_db)`를 등록하고 `install_ui(..., chat_model=Chat)`를 한 번 호출합니다. `/static`, `/`, `/api/me/chats`는 D 등록만 사용하여 중복 경로를 피합니다.
+`main.py`는 A 인증 라우터와 C의 `create_router(require_login, get_db)`를 등록하고 `install_ui(..., chat_model=Chat)`를 한 번 호출합니다. `/static`, `/`, `/api/me/chats`는 D 등록만 사용하여 중복 경로를 피합니다. 이전 임시 단일 HTML 화면은 제거했습니다.
 
 사용자별 최근 **성공 대화 5개**를 AI에 전달합니다. 외부 동기 HTTP 호출은 스레드로 분리하며 전체 트렌드 준비 시간도 제한합니다. 요청 수신, AI 시작·성공/실패, DB 저장 성공/실패를 기록합니다. 질문·키·AI 서비스의 원본 오류 본문은 로그에 넣지 않습니다.
 
@@ -86,22 +86,22 @@ app/
 | POST | `/api/auth/login` | 로그인·세션 쿠키, 200 |
 | POST | `/api/auth/logout` | 로그인 필요, 204 |
 | GET | `/api/me` | 내 사용자 정보·설정 여부, 키 값 제외 |
-| POST | `/api/chat` | 로그인 필요, q1/q4/q5/q6/free 질문·AI 응답·저장 |
+| POST | `/api/chat` | 로그인 필요, q1~q5 질문·AI 응답·저장 |
 | GET | `/api/me/chats?limit=20` | 내 기록만 최신순, 1~100개, no-store |
 
 ```json
-{"mode":"q4","message":"금리 인하 주제 지금 올려도 돼?","keyword":"금리 인하"}
+{"mode":"q3","message":"금리 인하 주제 지금 올려도 돼?","keyword":"금리 인하"}
 ```
 
-`keyword`는 Q4 타이밍 분석에서 선택적으로 지정할 수 있습니다. UI는 질문에서 키워드를 추출하는 기본 경로를 사용합니다. Q6 UI는 이전 업로드 주제를 입력하면 `최근 업로드 주제: ...\n질문: ...`를 한 message로 전송하며 전체 500자 제한을 적용합니다. 주제가 없으면 먼저 기존 주제를 물어보도록 프롬프트에 지시합니다.
+`keyword`는 API에서 선택적으로 지정할 수 있습니다. UI는 질문에서 키워드를 추출하는 기본 경로를 사용합니다. Q2 UI는 `최근 업로드 주제: ...\n질문: ...`를 한 message로 전송하며 전체 500자 제한을 적용합니다. API에서 맥락 없이 Q2를 호출하면 먼저 과거 업로드 주제를 물어보도록 지시합니다.
 
 성공: `{"chat_id":1,"answer":"..."}`. 비로그인 401, 입력 오류 422, AI 실패 502, 시간 초과 504, 저장 오류 500입니다. 기록 조회 DB 실패는 D 라우터에서 503으로 처리합니다. 시간 초과·AI 오류도 answer=null로 저장합니다.
 
 ## 시나리오 번호와 기존 기록
 
-현재 계약은 [docs/SCENARIOS.md](docs/SCENARIOS.md)의 q1/q4/q5/q6/free입니다. Q4는 타이밍, Q5는 새로운 각도, Q6는 다음 편입니다.
+현재 계약은 [docs/SCENARIOS.md](docs/SCENARIOS.md)의 Q1~Q5입니다. **이전 API의 q4 타이밍 호출은 q3로 바꾸세요.** 새 q4는 새로운 각도입니다.
 
-`chats.scenario_version`으로 기록의 번호 체계를 구분합니다. 서버 시작 시 기존 chats 테이블에 해당 열이 없으면 기본 1로 추가하며, 원래 mode·질문·답변은 그대로 보존합니다. 새 C 기록은 버전 3입니다. B의 Q1~Q5 번호로 저장된 버전 2 기록은 조회할 때 q3→q4, q4→q5, q5→q6로 표시합니다. API 응답 필드 수는 기존 계약과 같습니다. 스키마 변경은 반복 실행해도 열을 중복 추가하지 않습니다.
+`chats.scenario_version`으로 기록의 번호 체계를 구분합니다. 서버 시작 시 기존 chats 테이블에 해당 열이 없으면 기본 1로 추가하며, 원래 mode·질문·답변은 그대로 보존합니다. 새 기록은 버전 2(화면 Q1~Q5 번호)입니다. 기록 API는 계획서 번호로 저장된 버전 1과 버전 3(C 통합 중 사용)의 q4/q5/q6를 화면 q3/q4/q5로 변환하여 응답합니다. API 응답 필드 수는 기존 계약과 같습니다. SQL에서 원본 mode를 볼 때는 scenario_version도 함께 확인하세요. 스키마 변경은 반복 실행해도 열을 중복 추가하지 않습니다.
 
 users와 chats는 user_id로 연결됩니다. DB 생성 시각은 UTC이며 D 화면은 offset 없는 시각을 `(서버 시각)`으로 표시합니다.
 
@@ -120,7 +120,7 @@ users와 chats는 user_id로 연결됩니다. DB 생성 시각은 UTC이며 D �
 
 테스트는 임시 DB와 모의 외부 응답을 사용하며 실제 유료 API를 호출하지 않습니다. 기존 인증·UI 테스트에 다섯 모드 분기·프롬프트·대화 저장·사용자 격리·오류·구 기록 호환 검사를 포함합니다.
 
-실제 연결 확인은 아래 명령으로 별도 수행할 수 있습니다. **실제 API 사용량이 발생할 수 있습니다.** 임시 DB에서 가입→로그인→Q4 실제 AI 호출→기록을 확인하며 운영 app.db는 수정하지 않습니다.
+실제 연결 확인은 아래 명령으로 별도 수행할 수 있습니다. **실제 API 사용량이 발생할 수 있습니다.** 임시 DB에서 가입→로그인→Q3 실제 AI 호출→기록을 확인하며 운영 app.db는 수정하지 않습니다.
 
 ```bash
 .venv/bin/python -m scripts.check_connection
