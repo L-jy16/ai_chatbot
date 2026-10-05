@@ -86,7 +86,7 @@ def test_db_failure_is_recoverable(logged_in, monkeypatch):
     assert '기록을 불러오지 못했습니다' in response.json()['detail']
 
 
-@pytest.mark.parametrize('mode', ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'free'])
+@pytest.mark.parametrize('mode', ['q1', 'q2', 'q3', 'q4', 'q5'])
 def test_each_mode_saves_then_appears_in_history(logged_in, mode):
     response = logged_in.post('/api/chat', json={'mode': mode, 'message': '테스트 질문'})
     assert response.status_code == 200
@@ -127,8 +127,8 @@ def test_q2_uses_previous_upload_topics_and_saves_context(logged_in):
     assert logged_in.get('/api/me/chats?limit=1').json()[0]['question'] == message
 
 
-def test_unknown_mode_rejected(logged_in):
-    assert logged_in.post('/api/chat', json={'mode': 'q7', 'message': '지원하지 않는 번호'}).status_code == 422
+def test_removed_q6_mode_rejected(logged_in):
+    assert logged_in.post('/api/chat', json={'mode': 'q6', 'message': '이전 번호'}).status_code == 422
 
 
 def test_logout_revokes_pages_and_api(logged_in):

@@ -13,8 +13,7 @@ let mode = 'q1';
 
 function requestMessage() {
   const question = input.value.trim();
-  return mode === 'q6' && question && topics.value.trim()
-    ? `최근 업로드 주제: ${topics.value.trim()}\n질문: ${question}` : question;
+  return mode === 'q2' && question ? `최근 업로드 주제: ${topics.value.trim()}\n질문: ${question}` : question;
 }
 function updateCount() {
   document.querySelector('#char-count').textContent = `${requestMessage().length} / 500`;
@@ -49,9 +48,14 @@ input.addEventListener('keydown', (event) => {
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (send.disabled) return;
+  if (mode === 'q2' && !topics.value.trim()) {
+    showError(errorBox, '과거에 어떤 주제로 올리셨나요? 최근 업로드 주제를 먼저 입력해 주세요.');
+    topics.focus();
+    return;
+  }
   const message = requestMessage();
   if (!message || message.length > 500) {
-    showError(errorBox, '질문은 1~500자로 입력해 주세요.');
+    showError(errorBox, mode === 'q2' ? '업로드 주제와 질문을 합친 전송 내용은 1~500자로 입력해 주세요.' : '질문은 1~500자로 입력해 주세요.');
     input.focus();
     return;
   }
