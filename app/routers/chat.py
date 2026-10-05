@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,14 +14,14 @@ from app.dependencies import require_login
 from app.errors import APIError
 from app.models import Chat, User
 from app.services import llm
-from app.services.scenarios import q1, q4
+from app.services.scenarios import q1, q2, q3, q4, q5
 
 router = APIRouter(prefix="/api", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
-    mode: Literal["q1", "q4"] = "q1"
+    mode: Literal["q1", "q2", "q3", "q4", "q5"] = "q1"
     message: str
     keyword: str | None = None
 
@@ -81,7 +81,13 @@ async def chat(body: ChatRequest, user: User = Depends(require_login), db: Sessi
     record = Chat(user_id=user.id, mode=body.mode, question=body.message, status="error")
     try:
         # 트렌드 조회 전체에도 상한을 둔다. 동기 HTTP는 시나리오에서 스레드로 분리한다.
-        prompt_task = q1.build_prompt(body.message) if body.mode == "q1" else q4.build_prompt(body.message, body.keyword)
+        if body.mode == "q1":
+            prompt_task = q1.build_prompt(body.message)
+        elif body.mode == "q2":
+            prompt_task = q2.build_prompt(body.message, context=[item.question for item in reversed(previous)])
+        else:
+            scenario = {"q3": q3, "q4": q4, "q5": q5}[body.mode]
+            prompt_task = scenario.build_prompt(body.message, body.keyword)
         system = await asyncio.wait_for(prompt_task, timeout=settings.NAVER_TIMEOUT_SECONDS * 4 + 2)
         logger.info("ai_call_start user_id=%s mode=%s", user.id, body.mode)
         record.answer = await llm.ask_llm(system, messages)
@@ -107,10 +113,3 @@ def me(user: User = Depends(require_login)):
         "trend_configured": bool(settings.NAVER_CLIENT_ID and settings.NAVER_CLIENT_SECRET),
         "llm_configured": bool(settings.LLM_API_KEY and settings.LLM_MODEL),
     }
-
-
-@router.get("/me/chats")
-def history(limit: int = Query(default=20, ge=1, le=100), user: User = Depends(require_login), db: Session = Depends(get_db)):
-    rows = db.scalars(select(Chat).where(Chat.user_id == user.id).order_by(Chat.id.desc()).limit(limit))
-    return [{"id": r.id, "mode": r.mode, "question": r.question, "answer": r.answer,
-             "status": r.status, "created_at": r.created_at} for r in rows]

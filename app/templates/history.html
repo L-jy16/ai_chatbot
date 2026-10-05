@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}내 대화 기록{% endblock %}
+{% block content %}
+<section class="history-intro"><p class="eyebrow">CREATOR WORKSPACE / 02</p><h1>아이디어는 쌓이고,<br>이야기는 이어집니다.</h1><p class="muted">내가 물었던 질문과 답변을 한곳에서 다시 살펴보세요.</p></section>
+<section aria-labelledby="history-heading">
+  <div class="history-toolbar"><div><h2 id="history-heading">내 대화 기록</h2><p id="history-count" class="tiny muted" role="status">기록을 불러오는 중…</p></div><div class="history-controls"><label for="history-limit" class="tiny">조회 개수</label><select id="history-limit"><option value="20">최근 20개</option><option value="50">최근 50개</option><option value="100">최근 100개</option></select><button class="button button-small" id="refresh-history" type="button">새로고침 ↻</button></div></div>
+  <p id="history-error" class="error-message" role="alert" hidden></p>
+  <a id="history-login" class="login-again" href="/login" hidden>다시 로그인하기 ↗</a>
+  <div id="history-loading" class="card history-empty" role="status">대화 기록을 불러오고 있어요.</div>
+  <div id="history-empty" class="card history-empty" hidden><span class="empty-icon" aria-hidden="true">↗</span><h3>첫 번째 아이디어를 남겨보세요.</h3><p class="muted">질문을 보내면 대화 기록이 이곳에 차곡차곡 쌓여요.</p><a class="button button-small" href="/">주제 찾으러 가기 ↗</a></div>
+  <div id="history-list" class="history-list"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', path='js/history.js') }}"></script>{% endblock %}

@@ -13,6 +13,8 @@ class Chat(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     mode: Mapped[str] = mapped_column(String(10))
+    # 1: 이전 Q4=타이밍, 2: 새 UI Q3=타이밍·Q4=새로운 각도
+    scenario_version: Mapped[int] = mapped_column(default=2, server_default="2")
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(10))

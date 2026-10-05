@@ -9,7 +9,7 @@ import requests
 
 from app.config import settings
 from app.services import trend
-from app.services.scenarios import q1, q4
+from app.services.scenarios import q1, q3
 
 
 def points(past, recent):
@@ -59,10 +59,10 @@ def test_q1_includes_comparison_and_channel_context(monkeypatch):
     assert '"recent": 60' in result and '과거 업로드' in result
 
 
-def test_q4_extracts_keyword_and_includes_unknown(monkeypatch):
+def test_q3_extracts_keyword_and_includes_unknown(monkeypatch):
     compare=Mock(return_value={'recent':None,'past':None,'trend':'unknown','available':False})
     monkeypatch.setattr(trend,'compare_periods',compare)
     monkeypatch.setattr(trend,'search_news',lambda *args:[])
-    result=asyncio.run(q4.build_prompt('금리 인하 주제 지금 올려도 돼?'))
+    result=asyncio.run(q3.build_prompt('금리 인하 주제 지금 올려도 돼?'))
     compare.assert_called_once_with('금리 인하')
     assert '"available": false' in result and '판단 보류' in result

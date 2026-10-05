@@ -11,7 +11,9 @@ from app.services import llm
 @pytest.fixture
 def ai(monkeypatch):
     monkeypatch.setattr(chat.q1, 'build_prompt', AsyncMock(return_value='Q1 prompt'))
-    monkeypatch.setattr(chat.q4, 'build_prompt', AsyncMock(return_value='Q4 prompt'))
+
+    for scenario in (chat.q2, chat.q3, chat.q4, chat.q5):
+        monkeypatch.setattr(scenario, 'build_prompt', AsyncMock(return_value='scenario prompt'))
     mock = AsyncMock(return_value='추천 주제와 데이터 한계')
     monkeypatch.setattr(llm, 'ask_llm', mock)
     return mock
@@ -24,7 +26,7 @@ def test_chat_requires_login(client, ai):
 
 @pytest.mark.parametrize('body', [
     {'mode':'q1','message':'  '}, {'mode':'q4','message':'x'*501},
-    {'mode':'q5','message':'주제'}, {'mode':'q4','message':'주제','keyword':'x'*51},
+    {'mode':'q6','message':'주제'}, {'mode':'q4','message':'주제','keyword':'x'*51},
 ])
 def test_chat_validation(logged_in_client, ai, body):
     assert logged_in_client.post('/api/chat', json=body).status_code == 422
@@ -45,10 +47,10 @@ def test_chat_saves_and_uses_previous_context(logged_in_client, db_session, ai):
     assert logged_in_client.get('/api/me/chats?limit=2').json()[0]['id'] == record.id
 
 
-def test_q4_passes_keyword(logged_in_client, ai):
-    response=logged_in_client.post('/api/chat', json={'mode':'q4','message':'올려도 돼?','keyword':'금리 인하'})
+def test_q3_passes_keyword(logged_in_client, ai):
+    response=logged_in_client.post('/api/chat', json={'mode':'q3','message':'올려도 돼?','keyword':'금리 인하'})
     assert response.status_code == 200
-    chat.q4.build_prompt.assert_awaited_once_with('올려도 돼?', '금리 인하')
+    chat.q3.build_prompt.assert_awaited_once_with('올려도 돼?', '금리 인하')
 
 
 @pytest.mark.parametrize('error,code,status', [(llm.AITimeoutError(),504,'timeout'),(llm.AIError(),502,'error')])
@@ -77,3 +79,25 @@ def test_static_and_configuration_do_not_expose_keys(logged_in_client):
     assert 'LLM_API_KEY' not in data
     assert data['trend_configured'] is False
     assert logged_in_client.get('/.env').status_code==404
+
+@pytest.mark.parametrize('mode', ['q1','q2','q3','q4','q5'])
+def test_all_ui_modes_are_saved_with_new_version(logged_in_client, db_session, ai, mode):
+    response=logged_in_client.post('/api/chat',json={'mode':mode,'message':'최근 업로드 주제: 반도체\n질문: 오늘 주제'})
+    assert response.status_code==200
+    record=db_session.get(Chat,response.json()['chat_id'])
+    assert record.mode==mode and record.scenario_version==2
+    assert logged_in_client.get('/api/me/chats').json()[0]['mode']==mode
+    getattr(chat,mode).build_prompt.assert_awaited_once()
+
+
+def test_no_duplicate_ui_or_history_routes():
+    from app.main import app
+    def paths(router):
+        for route in router.routes:
+            if hasattr(route, 'original_router'):
+                yield from paths(route.original_router)
+            else:
+                yield getattr(route, 'path', None)
+    registered=list(paths(app))
+    for path in ('/','/api/me/chats','/api/chat','/static'):
+        assert registered.count(path)==1
