@@ -228,8 +228,24 @@ def compare_periods(keyword: str) -> dict:
     recent = _average_ratio(recent_values)
     past = _average_ratio(past_values)
 
+    if past == 0:
+        if recent > 0:
+            trend = "rising"
+        else:
+            trend = "stable"
+
+    elif recent >= past * 1.2:
+        trend = "rising"
+
+    elif recent <= past * 0.8:
+        trend = "falling"
+
+    else:
+        trend = "stable"
+
+
     return {
         "recent": recent,
         "past": past,
-        "trend": "stable",
+        "trend": trend,
     }
