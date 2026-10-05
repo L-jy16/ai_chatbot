@@ -9,7 +9,9 @@ from app.config import settings
 from app.database import Base, engine, get_db, upgrade_chat_schema
 from app.dependencies import get_current_user, require_login
 from app.errors import register_error_handlers
-from app.routers import auth, chat
+from app.models.chat import Chat
+from app.routers import auth
+from app.routers.chat import create_router
 from app.ui import install_ui
 
 logging.basicConfig(
@@ -34,9 +36,14 @@ app.add_middleware(
 )
 register_error_handlers(app)
 app.include_router(auth.router)
-app.include_router(chat.router)
-install_ui(app, require_login=require_login, get_db=get_db,
-           get_current_user=get_current_user, chat_model=models.Chat)
+app.include_router(create_router(require_login, get_db))
+install_ui(
+    app,
+    require_login=require_login,
+    get_db=get_db,
+    get_current_user=get_current_user,
+    chat_model=Chat,
+)
 
 
 @app.get("/health")

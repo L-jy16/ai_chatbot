@@ -1,49 +1,63 @@
-"""OpenAI Chat Completions 호환 게이트웨이. 키와 원본 오류 본문은 기록하지 않는다."""
-import asyncio
-import logging
+"""A single server-side call to Codyssey's OpenAI-compatible chat endpoint."""
 
-import httpx2 as httpx
-
-from app.config import settings
-
-logger = logging.getLogger(__name__)
+import httpx
 
 
 class AITimeoutError(Exception):
-    pass
+    """The upstream service did not answer before the configured deadline."""
 
 
-class AIError(Exception):
-    pass
+class AIServiceError(Exception):
+    """The upstream service could not provide a usable answer."""
+
+
+# Keep the name used by B's integration tests and call sites.
+AIError = AIServiceError
+
+# gpt-5-mini는 답변 전에 추론 토큰을 먼저 쓴다. 1200이면 추론에 다 써서 빈 답변이 온다.
+# (실제 측정: 한도 1200 → content="", finish_reason=length / 한도 4000 → 1712토큰으로 정상 답변)
+MAX_COMPLETION_TOKENS = 4000
 
 
 async def ask_llm(system: str, messages: list[dict]) -> str:
-    if not settings.LLM_API_KEY or not settings.LLM_MODEL:
-        raise AIError("LLM 설정이 필요합니다.")
+    """Send one request. Never expose the provider key to the browser."""
+    from app.config import settings
 
-    async def request() -> str:
-        async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                settings.LLM_BASE_URL.rstrip("/") + "/chat/completions",
-                headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
-                json={
-                    "model": settings.LLM_MODEL,
-                    "messages": [{"role": "system", "content": system}, *messages],
-                },
-            )
-            response.raise_for_status()
-            answer = response.json()["choices"][0]["message"]["content"]
-            if not isinstance(answer, str) or not answer.strip():
-                raise AIError("AI 응답이 비어 있습니다.")
-            return answer.strip()
+    key = settings.LLM_API_KEY.strip()
+    if not key:
+        raise AIServiceError("LLM_API_KEY is not configured")
+
+    model = settings.LLM_MODEL.strip() or "gpt-5-mini"
+    base_url = getattr(settings, "LLM_BASE_URL", "https://copa.codyssey.kr/v1").rstrip("/")
+    try:
+        timeout = float(settings.LLM_TIMEOUT_SECONDS)
+        if timeout <= 0:
+            raise ValueError
+    except ValueError as exc:
+        raise AIServiceError("LLM_TIMEOUT_SECONDS must be positive") from exc
+    payload = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, *messages],
+        "max_completion_tokens": MAX_COMPLETION_TOKENS,
+    }
 
     try:
-        return await asyncio.wait_for(request(), timeout=settings.LLM_TIMEOUT_SECONDS)
-    except (asyncio.TimeoutError, httpx.TimeoutException) as exc:
-        raise AITimeoutError() from exc
-    except httpx.HTTPStatusError as exc:
-        logger.warning("llm_http_error status=%s", exc.response.status_code)
-        raise AIError("AI 서비스 요청 실패") from exc
-    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as exc:
-        logger.warning("llm_response_error type=%s", type(exc).__name__)
-        raise AIError("AI 서비스 응답 오류") from exc
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(
+                f"{base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise AITimeoutError from exc
+    except httpx.HTTPError as exc:
+        raise AIServiceError("AI request failed") from exc
+
+    try:
+        answer = response.json()["choices"][0]["message"]["content"]
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise AIServiceError("AI response has an unexpected shape") from exc
+    if not isinstance(answer, str) or not answer.strip():
+        raise AIServiceError("AI response is empty")
+    return answer.strip()

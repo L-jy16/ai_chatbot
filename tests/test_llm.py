@@ -1,44 +1,103 @@
 import asyncio
+import json
+import sys
+import types
+from types import SimpleNamespace
 
-import httpx2 as httpx
+import httpx
 import pytest
 
-from app.config import settings
-from app.services import llm
+from app.services.llm import AIServiceError, AITimeoutError, ask_llm
 
 
-@pytest.fixture
-def transport(monkeypatch):
-    monkeypatch.setattr(settings,'LLM_API_KEY','unit-test-secret')
-    monkeypatch.setattr(settings,'LLM_MODEL','unit-model')
-    monkeypatch.setattr(settings,'LLM_BASE_URL','https://example.test/v1')
-    factory=httpx.AsyncClient
-    def install(handler):
-        monkeypatch.setattr(llm.httpx,'AsyncClient',lambda **kw:factory(transport=httpx.MockTransport(handler),**kw))
-    return install
+@pytest.fixture(autouse=True)
+def config_settings(monkeypatch):
+    """A's settings contract, supplied only inside the test."""
+    module = types.ModuleType("app.config")
+    module.settings = SimpleNamespace(
+        LLM_API_KEY="test-only", LLM_MODEL="", LLM_TIMEOUT_SECONDS=30
+    )
+    monkeypatch.setitem(sys.modules, "app.config", module)
+    return module.settings
 
 
-def test_llm_request_and_response(transport):
-    import json
-    def handler(request):
-        assert str(request.url)=='https://example.test/v1/chat/completions'
-        assert request.headers['authorization']=='Bearer unit-test-secret'
-        body=json.loads(request.content)
-        assert body['model']=='unit-model'
-        assert body['messages']==[{'role':'system','content':'instructions'},{'role':'user','content':'hello'}]
-        return httpx.Response(200,json={'choices':[{'message':{'content':'안녕하세요'}}]})
-    transport(handler)
-    assert asyncio.run(llm.ask_llm('instructions',[{'role':'user','content':'hello'}]))=='안녕하세요'
+def test_llm_sends_one_server_side_request(monkeypatch):
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": " 추천 답변 "}}]})
+
+    transport = httpx.MockTransport(respond)
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs))
+
+    answer = asyncio.run(ask_llm("시스템", [{"role": "user", "content": "질문"}]))
+
+    assert answer == "추천 답변"
+    assert len(calls) == 1
+    assert str(calls[0].url) == "https://copa.codyssey.kr/v1/chat/completions"
+    body = json.loads(calls[0].content)
+    assert body["model"] == "gpt-5-mini"
+    assert [item["role"] for item in body["messages"]] == ["system", "user"]
+    assert body["max_completion_tokens"] == 4000
 
 
-@pytest.mark.parametrize('status,body',[(401,{'error':'unit-test-secret'}),(200,{}),(200,{'choices':[{'message':{'content':None}}]})])
-def test_llm_error_is_safe(transport,status,body,caplog):
-    transport(lambda req:httpx.Response(status,json=body))
-    with pytest.raises(llm.AIError):asyncio.run(llm.ask_llm('system',[]))
-    assert 'unit-test-secret' not in caplog.text
+def test_llm_leaves_room_for_reasoning_tokens(monkeypatch):
+    # gpt-5-mini는 답변을 쓰기 전에 추론 토큰을 먼저 쓴다. 실제 API에서 한도 1200이면
+    # 추론에 다 써서 content=""·finish_reason=length가 왔고, 4000이면 1712토큰으로 정상 답변했다.
+    reasoning_tokens, answer_tokens = 1700, 300
+
+    def respond(request):
+        budget = json.loads(request.content)["max_completion_tokens"]
+        if budget < reasoning_tokens + answer_tokens:
+            choice = {"message": {"content": ""}, "finish_reason": "length"}
+        else:
+            choice = {"message": {"content": "추천 답변"}, "finish_reason": "stop"}
+        return httpx.Response(200, json={"choices": [choice]})
+
+    transport = httpx.MockTransport(respond)
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs))
+
+    assert asyncio.run(ask_llm("시스템", [{"role": "user", "content": "질문"}])) == "추천 답변"
 
 
-def test_llm_timeout(transport):
-    def handler(req):raise httpx.ReadTimeout('timed out',request=req)
-    transport(handler)
-    with pytest.raises(llm.AITimeoutError):asyncio.run(llm.ask_llm('system',[]))
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        (httpx.Response(429), "AI request failed"),
+        (httpx.Response(200, json={"choices": []}), "unexpected shape"),
+        (httpx.Response(200, json={"choices": [{"message": {"content": ""}}]}), "empty"),
+    ],
+)
+def test_llm_failure_is_normalized_without_retry(monkeypatch, response, expected):
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return response
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs))
+
+    with pytest.raises(AIServiceError, match=expected):
+        asyncio.run(ask_llm("system", [{"role": "user", "content": "question"}]))
+    assert len(calls) == 1
+
+
+def test_llm_timeout_has_dedicated_error(monkeypatch):
+    def respond(request):
+        raise httpx.ReadTimeout("slow", request=request)
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs))
+
+    with pytest.raises(AITimeoutError):
+        asyncio.run(ask_llm("system", [{"role": "user", "content": "question"}]))
+
+
+def test_llm_does_not_call_api_without_key(config_settings):
+    config_settings.LLM_API_KEY = ""
+    with pytest.raises(AIServiceError, match="not configured"):
+        asyncio.run(ask_llm("system", []))

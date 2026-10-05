@@ -38,4 +38,4 @@ def test_optional_settings_have_defaults(monkeypatch):
     assert settings.NAVER_CLIENT_SECRET == ""
     assert settings.LLM_API_KEY == ""
     assert settings.LLM_MODEL == ""
-    assert settings.LLM_TIMEOUT_SECONDS == 30
+    assert settings.LLM_TIMEOUT_SECONDS == 50  # gpt-5-mini 추론 응답이 30초를 넘는 경우가 있다

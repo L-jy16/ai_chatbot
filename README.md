@@ -4,7 +4,7 @@
 
 ## 현재 통합 상태
 
-A의 인증·SQLite, B의 트렌드, 서버 AI 연결, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 다섯 모드 모두 서버 프롬프트·LLM·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
+A의 인증·SQLite, B의 트렌드, C의 채팅·AI, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 다섯 모드 모두 C의 채팅 라우터에서 서버 프롬프트·LLM·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
 
 | 모드 | 기능 |
 | --- | --- |
@@ -52,7 +52,7 @@ Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.ex
 | `LLM_API_KEY` | Codyssey에서 발급한 AI 키 |
 | `LLM_BASE_URL` | `https://copa.codyssey.kr/v1` |
 | `LLM_MODEL` | `.env.example`은 `gpt-5-mini`, 사용 계정의 허용 모델 지정 |
-| `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 30초 |
+| `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 50초 (gpt-5-mini 추론 응답이 30초를 넘을 수 있어 늘림, 브라우저 제한 65초보다 짧게 유지) |
 
 사진의 Claude Code 설정 파일을 이 앱에서 읽지는 않습니다. 프로젝트 `.env`를 사용합니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
 
@@ -68,13 +68,13 @@ app/
 ├── routers/auth.py, chat.py             # 인증·AI 요청
 ├── routers/pages.py, logs.py            # D 페이지·기록 조회
 ├── services/trend.py, llm.py            # 네이버·AI
-├── services/scenarios/q1.py ~ q5.py      # 최신 UI 모드별 프롬프트
+├── services/scenarios/                  # 모드별 프롬프트 (모드↔파일 대응: docs/SCENARIOS.md)
 ├── ui.py                               # 페이지·static·기록 라우터 등록
 ├── templates/                          # D Jinja2 템플릿
 └── static/css/, static/js/              # D UI
 ```
 
-`main.py`는 `auth.router`, `chat.router`를 등록하고 `install_ui(..., chat_model=models.Chat)`를 한 번 호출합니다. `/static`, `/`, `/api/me/chats`는 D 등록만 사용하여 중복 경로를 피합니다. 이전 임시 단일 HTML 화면은 제거했습니다.
+`main.py`는 A 인증 라우터와 C의 `create_router(require_login, get_db)`를 등록하고 `install_ui(..., chat_model=Chat)`를 한 번 호출합니다. `/static`, `/`, `/api/me/chats`는 D 등록만 사용하여 중복 경로를 피합니다. 이전 임시 단일 HTML 화면은 제거했습니다.
 
 사용자별 최근 **성공 대화 5개**를 AI에 전달합니다. 외부 동기 HTTP 호출은 스레드로 분리하며 전체 트렌드 준비 시간도 제한합니다. 요청 수신, AI 시작·성공/실패, DB 저장 성공/실패를 기록합니다. 질문·키·AI 서비스의 원본 오류 본문은 로그에 넣지 않습니다.
 
@@ -101,7 +101,7 @@ app/
 
 현재 계약은 [docs/SCENARIOS.md](docs/SCENARIOS.md)의 Q1~Q5입니다. **이전 API의 q4 타이밍 호출은 q3로 바꾸세요.** 새 q4는 새로운 각도입니다.
 
-`chats.scenario_version`으로 기록의 번호 체계를 구분합니다. 서버 시작 시 기존 chats 테이블에 해당 열이 없으면 기본 1로 추가하며, 원래 mode·질문·답변은 그대로 보존합니다. 새 기록은 버전 2입니다. 기록 API는 버전 1의 q4/q5/q6를 새 UI q3/q4/q5로 변환하여 응답합니다. API 응답 필드 수는 기존 계약과 같습니다. SQL에서 원본 mode를 볼 때는 scenario_version도 함께 확인하세요. 스키마 변경은 반복 실행해도 열을 중복 추가하지 않습니다.
+`chats.scenario_version`으로 기록의 번호 체계를 구분합니다. 서버 시작 시 기존 chats 테이블에 해당 열이 없으면 기본 1로 추가하며, 원래 mode·질문·답변은 그대로 보존합니다. 새 기록은 버전 2(화면 Q1~Q5 번호)입니다. 기록 API는 계획서 번호로 저장된 버전 1과 버전 3(C 통합 중 사용)의 q4/q5/q6를 화면 q3/q4/q5로 변환하여 응답합니다. API 응답 필드 수는 기존 계약과 같습니다. SQL에서 원본 mode를 볼 때는 scenario_version도 함께 확인하세요. 스키마 변경은 반복 실행해도 열을 중복 추가하지 않습니다.
 
 users와 chats는 user_id로 연결됩니다. DB 생성 시각은 UTC이며 D 화면은 offset 없는 시각을 `(서버 시각)`으로 표시합니다.
 

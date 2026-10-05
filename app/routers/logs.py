@@ -24,8 +24,8 @@ class ChatLog(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_mode(cls, value):
-        # 기존 DB의 Q4 타이밍을 새 UI의 '새로운 각도'로 오표시하지 않는다.
-        if getattr(value, "scenario_version", 2) == 1:
+        # 계획서 번호(버전 1·3)로 저장된 기록을 현재 화면(D)의 Q1~Q5 번호로 표시한다.
+        if getattr(value, "scenario_version", 2) in (1, 3):
             row = {name: getattr(value, name) for name in cls.model_fields}
             row["mode"] = {"q4": "q3", "q5": "q4", "q6": "q5"}.get(row["mode"], row["mode"])
             return row
