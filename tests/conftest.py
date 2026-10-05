@@ -4,6 +4,9 @@ import os
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-only"
 # 앱 기본 엔진은 메모리 DB로 둔다. `with client:`로 lifespan이 돌아도 실제 ./app.db가 생기지 않는다.
 os.environ["DATABASE_URL"] = "sqlite://"
+# .env에 실제 키가 있어도 테스트에서 외부 유료 API를 호출하지 않도록 비워 둔다. (환경 변수가 .env보다 우선)
+for key in ("NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "LLM_API_KEY"):
+    os.environ[key] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -50,7 +53,7 @@ def client(session_factory):
 
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)  # 팀원이 건 다른 override는 건드리지 않는다
 
 
 @pytest.fixture

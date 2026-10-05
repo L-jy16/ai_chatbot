@@ -216,9 +216,9 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 
 - 도구: `pytest`, FastAPI `TestClient`(Starlette 1.x는 `httpx2`가 필요하다).
 - `tests/conftest.py`:
-  1. 앱 import 전에 테스트용 `SECRET_KEY` 환경 변수를 설정한다.
+  1. 앱 import 전에 환경 변수를 테스트용으로 고정한다: `SECRET_KEY`(테스트 키), `DATABASE_URL`(메모리 DB — `with client:`로 lifespan이 돌아도 `./app.db`가 생기지 않음), `NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`·`LLM_API_KEY`(빈 값 — `.env`의 실제 키로 유료 API를 호출하지 않음).
   2. 테스트마다 `tmp_path`에 임시 SQLite 파일을 만들고 `create_all`을 실행한다.
-  3. `app.dependency_overrides[get_db]`로 임시 DB 세션을 주입한다. 실제 `app.db`는 건드리지 않는다.
+  3. `app.dependency_overrides[get_db]`로 임시 DB 세션을 주입하고, 테스트가 끝나면 그 override만 지운다(팀원이 건 다른 override는 유지). 실제 `app.db`는 건드리지 않는다.
   4. `client` fixture를 제공한다. B·C·D도 같은 fixture를 쓴다.
 - 기능마다 실패하는 테스트를 먼저 쓰고 구현한다(TDD).
 - 검증 항목:
