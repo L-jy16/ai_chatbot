@@ -89,6 +89,19 @@ class UserResponse(BaseModel):
     email: str
 
 
+def email_for_log(email: str) -> str:
+    """로그에 남길 이메일. 형식이 올바른 이메일만 그대로 남긴다.
+
+    이메일 칸에 비밀번호를 잘못 넣은 경우, 줄바꿈으로 로그 줄을 위조하려는 경우,
+    지나치게 긴 입력은 값 대신 <invalid>로 남긴다.
+    """
+    try:
+        validate_email(email, check_deliverability=False)
+    except EmailNotValidError:
+        return "<invalid>"
+    return email
+
+
 def find_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email))
 
@@ -120,7 +133,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> UserResponse:
 def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> UserResponse:
     user = find_user_by_email(db, body.email)
     if user is None or not verify_password(body.password, user.password_hash):
-        logger.warning("login_failed email=%s", body.email)
+        logger.warning("login_failed email=%s", email_for_log(body.email))
         raise APIError(
             status.HTTP_401_UNAUTHORIZED,
             "INVALID_CREDENTIALS",

@@ -190,7 +190,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 | `signup_success` | INFO | `user_id` |
 | `signup_duplicate` | INFO | `email` |
 | `login_success` | INFO | `user_id` |
-| `login_failed` | WARNING | `email` |
+| `login_failed` | WARNING | `email` (형식이 올바른 이메일만 기록, 아니면 `<invalid>`) |
 | `logout` | INFO | `user_id` |
 
 비밀번호와 해시는 어떤 로그에도 남기지 않는다.

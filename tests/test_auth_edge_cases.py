@@ -72,3 +72,34 @@ def test_deleted_users_session_does_not_become_next_signup(logged_in_client, sig
     response = logged_in_client.post("/api/auth/logout")
     assert response.status_code == 401
     assert response.json() == LOGIN_REQUIRED
+
+
+def auth_log_messages(caplog):
+    return [record.getMessage() for record in caplog.records if record.name == "app.routers.auth"]
+
+
+def test_login_failed_log_cannot_be_forged_with_newline(login, caplog):
+    caplog.set_level(logging.INFO)
+    login(email="x\n2026-10-05 12:00:00 INFO app.routers.auth: login_success user_id=1")
+
+    messages = auth_log_messages(caplog)
+    assert not any("\n" in message for message in messages)
+    assert not any(message.startswith("login_success") for message in messages)
+
+
+def test_password_typed_into_email_field_is_not_logged(login, caplog):
+    caplog.set_level(logging.INFO)
+    login(email="secret-pass-123")
+    assert "secret-pass-123" not in caplog.text
+
+
+def test_login_failed_log_is_length_capped(login, caplog):
+    caplog.set_level(logging.INFO)
+    login(email="a" * 5000 + "@example.com")
+    assert all(len(message) < 300 for message in auth_log_messages(caplog))
+
+
+def test_login_failed_log_keeps_valid_email(login, caplog):
+    caplog.set_level(logging.INFO)
+    login(email="nobody@example.com")
+    assert "login_failed email=nobody@example.com" in auth_log_messages(caplog)
