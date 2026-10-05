@@ -122,6 +122,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 - 요청 본문 검증 실패(`RequestValidationError`)는 `422 INVALID_INPUT`으로 바뀐다.
   - Pydantic validator에서 `ValueError("질문은 1~500자로 입력해 주세요.")`를 던지면 그 문구가 그대로 `message`가 된다.
   - 그 밖의 검증 실패(필드 누락, 타입 오류)는 `"입력값이 올바르지 않아요."`로 응답한다.
+- 본문을 아예 읽지 못한 경우(잘못된 UTF-8, 너무 큰 정수, 지나친 중첩 — FastAPI 기본 400)도 `422 INVALID_INPUT`, 기본 문구로 바꾼다.
 - `APIError`가 아닌 FastAPI 기본 예외(존재하지 않는 경로의 404 등)는 기본 형식 `{"detail": ...}`를 유지한다.
 
 ### 3.5 로깅

@@ -1,8 +1,12 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 DEFAULT_INVALID_INPUT_MESSAGE = "입력값이 올바르지 않아요."
+# FastAPI가 요청 본문을 읽지 못했을 때(잘못된 UTF-8, 너무 큰 정수, 지나친 중첩 등) 던지는 400의 detail
+BODY_PARSE_ERROR_DETAIL = "There was an error parsing the body"
 
 
 class APIError(Exception):
@@ -37,6 +41,17 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
     return JSONResponse(status_code=422, content={"error": "INVALID_INPUT", "message": message})
 
 
+async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> Response:
+    """본문 파싱 실패(400)만 INVALID_INPUT 형식으로 바꾸고, 나머지(404 등)는 FastAPI 기본 처리에 맡긴다."""
+    if exc.status_code == 400 and exc.detail == BODY_PARSE_ERROR_DETAIL:
+        return JSONResponse(
+            status_code=422,
+            content={"error": "INVALID_INPUT", "message": DEFAULT_INVALID_INPUT_MESSAGE},
+        )
+    return await http_exception_handler(request, exc)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(APIError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)

@@ -1,3 +1,4 @@
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, field_validator
@@ -61,3 +62,24 @@ def test_non_object_body_gets_default_message():
     response = make_client().post("/echo", json=["text"])
     assert response.status_code == 422
     assert response.json() == {"error": "INVALID_INPUT", "message": "입력값이 올바르지 않아요."}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"text": "\xff"}',  # 잘못된 UTF-8 바이트
+        b'{"text": ' + b"1" * 5000 + b"}",  # 파이썬 정수 변환 한도(4300자리) 초과
+        b'{"text": ' + b"[" * 100000 + b"]" * 100000 + b"}",  # 지나치게 깊은 중첩
+    ],
+    ids=["invalid-utf8", "huge-int", "deep-nesting"],
+)
+def test_unparsable_body_gets_invalid_input_shape(raw):
+    response = make_client().post("/echo", content=raw, headers={"content-type": "application/json"})
+    assert response.status_code == 422
+    assert response.json() == {"error": "INVALID_INPUT", "message": "입력값이 올바르지 않아요."}
+
+
+def test_unknown_path_keeps_default_404():
+    response = make_client().get("/no-such-path")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
