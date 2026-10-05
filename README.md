@@ -4,6 +4,7 @@
 
 ## 프로젝트 개요
 
+- **서비스 URL**: 배포 후 기입 (`http://<서버 공인 IP>:8000`, 절차는 [배포 가이드](docs/DEPLOY.md))
 - **문제 정의**: AI·경제 정보가 너무 많아, 무엇이 지금 뜨는 주제이고 무엇이 이미 지난 주제인지 구분하기 어렵습니다.
 - **타겟 사용자**: 유튜브 경제·AI 숏폼 제작자
 - **핵심 원칙**: LLM은 오늘의 이슈를 모르므로, 서버가 네이버 뉴스 검색·데이터랩 검색 추이를 모아 프롬프트에 넣고 답하게 합니다. 자료가 없으면 지어내지 않고 한계를 밝힙니다.
@@ -24,9 +25,9 @@
 
 A의 인증·SQLite, B의 트렌드, C의 채팅·AI, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 다섯 모드 모두 C의 채팅 라우터에서 서버 프롬프트·LLM·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
 
-뉴스는 최신순 일부 검색 결과이며 인기 순위나 전체 언급량이 아닙니다. 데이터가 없거나 조회에 실패하면 실시간 사실을 지어내지 않고 한계를 알리도록 프롬프트에 명시합니다. 실제 답변 품질과 키 권한은 별도 실서비스 확인이 필요합니다. 배포·외부 접속 설정은 포함하지 않습니다.
+뉴스는 최신순 일부 검색 결과이며 인기 순위나 전체 언급량이 아닙니다. 데이터가 없거나 조회에 실패하면 실시간 사실을 지어내지 않고 한계를 알리도록 프롬프트에 명시합니다. 실제 답변 품질과 키 권한은 별도 실서비스 확인이 필요합니다.
 
-## 실행
+## 로컬 실행
 
 Python 3.10 이상. 기존 가상환경과 `.env`가 있으면 그대로 사용하며, 예제 파일로 덮어쓰지 마세요.
 
@@ -51,6 +52,24 @@ Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.ex
 
 상태 확인: `/health`. API 문서: `/docs`. `.env`를 바꾸면 서버를 재시작합니다. 서버는 기본 `app.db`에 users·chats 테이블을 생성합니다.
 
+## 배포
+
+VM 1대에 uvicorn + systemd로 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속합니다. 전체 절차와 문제 해결은 **[docs/DEPLOY.md](docs/DEPLOY.md)**에 있습니다.
+
+```bash
+sudo apt install -y git python3 python3-venv
+git clone https://github.com/L-jy16/ai_chatbot.git && cd ai_chatbot
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env && chmod 600 .env        # SECRET_KEY·API 키 입력
+sudo cp deploy/ai-chatbot.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now ai-chatbot
+curl http://<서버 공인 IP>:8000/health         # 보안 그룹·ufw에서 TCP 8000 허용 후 확인
+```
+
+- 서비스 파일: [deploy/ai-chatbot.service](deploy/ai-chatbot.service) (`--host 0.0.0.0 --port 8000 --workers 1`, 앱이 실행 폴더의 `.env`를 읽음)
+- 로그: `journalctl -u ai-chatbot -f` (요청 수신·AI 호출·AI 응답/실패·DB 저장 이벤트)
+- 업데이트: `git pull` → `pip install -r requirements.txt` → `sudo systemctl restart ai-chatbot`
+
 ## 환경 변수와 API 연결
 
 | 변수 | 설명 / 기본값 |
@@ -64,9 +83,17 @@ Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.ex
 | `LLM_MODEL` | `.env.example`은 `gpt-5-mini`, 사용 계정의 허용 모델 지정 |
 | `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 50초 (gpt-5-mini 추론 응답이 30초를 넘을 수 있어 늘림, 브라우저 제한 65초보다 짧게 유지) |
 
-사진의 Claude Code 설정 파일을 이 앱에서 읽지는 않습니다. 프로젝트 `.env`를 사용합니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
+앱은 실행 폴더의 `.env`를 읽습니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
 
-키는 서버에서만 사용합니다. `.env`·가상환경·DB는 Git에서 제외됩니다. 브라우저는 같은 출처의 `/api/*`만 호출합니다. D 페이지는 CSP와 `textContent`로 질문·답변의 HTML 실행을 방지합니다.
+## 민감정보 관리
+
+- **`.env`는 커밋하지 않습니다.** `.gitignore`가 `.env`, `.env.*`(단 `.env.example` 제외), `.venv/`, `*.db`를 제외합니다. 저장소에는 변수 이름과 기본값만 있는 [`.env.example`](.env.example)을 둡니다. 새 키가 생기면 `.env.example`에 이름만 추가합니다.
+- **API 키는 서버에서만 씁니다.** LLM·네이버 호출은 모두 서버에서 하고, 브라우저는 같은 출처의 `/api/*`만 호출합니다. `/api/me`는 키 값이 아니라 설정 여부(`true`/`false`)만 알려 줍니다.
+- **비밀번호는 bcrypt 해시로만 저장합니다.** 서버 로그에는 비밀번호·해시·API 키·AI 서비스의 원본 오류 본문을 남기지 않고, 로그인 실패 로그에는 형식이 올바른 이메일만 남깁니다.
+- **세션 쿠키**는 `SECRET_KEY`로 서명되고 `httponly`·`SameSite=Lax`입니다. `SECRET_KEY`가 없거나 16자 미만이면 서버가 시작되지 않습니다.
+- D 페이지는 CSP와 `textContent`로 질문·답변의 HTML 실행을 막습니다.
+- 테스트는 외부 API 키를 빈 값으로 고정해 실제 유료 API를 호출하지 않습니다.
+- 서버의 `.env`는 `chmod 600`으로 두고, 키가 노출되면 즉시 재발급한 뒤 `.env`만 바꿔 재시작합니다.
 
 ## 구조와 연결
 
