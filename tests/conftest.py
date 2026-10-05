@@ -10,6 +10,9 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from app.database import Base, create_db_engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
+TEST_EMAIL = "creator@example.com"
+TEST_PASSWORD = "shorts1234"
+
 
 @pytest.fixture
 def db_engine(tmp_path):
@@ -46,3 +49,13 @@ def client(session_factory):
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def signup(client):
+    """회원가입 요청을 보내는 함수를 돌려준다. signup(email=..., password=...)"""
+
+    def _signup(email=TEST_EMAIL, password=TEST_PASSWORD):
+        return client.post("/api/auth/signup", json={"email": email, "password": password})
+
+    return _signup

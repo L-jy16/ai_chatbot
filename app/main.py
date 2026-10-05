@@ -8,6 +8,7 @@ from app import models  # noqa: F401  모델을 Base에 등록해 create_all 대
 from app.config import settings
 from app.database import Base, engine
 from app.errors import register_error_handlers
+from app.routers import auth
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +30,7 @@ app.add_middleware(
     https_only=False,  # VM에 HTTP로 배포해도 쿠키가 전송되도록
 )
 register_error_handlers(app)
+app.include_router(auth.router)
 
 
 @app.get("/health")
