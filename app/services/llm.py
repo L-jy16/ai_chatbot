@@ -21,7 +21,12 @@ async def ask_llm(system: str, messages: list[dict]) -> str:
 
     base_url = os.getenv("AI_BASE_URL", "https://copa.codyssey.kr/v1").rstrip("/")
     model = os.getenv("AI_MODEL", "gpt-5-mini")
-    timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
+    try:
+        timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
+        if timeout <= 0:
+            raise ValueError
+    except ValueError as exc:
+        raise AIServiceError("AI_TIMEOUT_SECONDS must be positive") from exc
     payload = {
         "model": model,
         "messages": [{"role": "system", "content": system}, *messages],
