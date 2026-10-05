@@ -15,7 +15,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 
 
-ALLOWED_MODES = {"q1", "q4", "q5", "q6", "free"}
+# 화면(D)의 모드 번호. 시나리오 파일 번호와 다르므로 post_chat에서 대응시킨다.
+#   q1 오늘의 주제 → scenarios/q1.py (B)    q2 운영 채널 추천 → scenarios/q2.py (B)
+#   q3 타이밍 체크 → scenarios/q3.py (B)    q4 새로운 각도 → scenarios/q5.py (C)
+#   q5 다음 편 기획 → scenarios/q6.py (C)   free 자유 질문 → 기본 프롬프트
+ALLOWED_MODES = {"q1", "q2", "q3", "q4", "q5", "free"}
 logger = logging.getLogger(__name__)
 
 
@@ -89,7 +93,7 @@ def create_router(require_login, get_db) -> APIRouter:
     """Register C's route with A's actual authentication and DB dependencies."""
     from app.models.chat import Chat
     from app.services.llm import AIServiceError, AITimeoutError, ask_llm
-    from app.services.scenarios import q5, q6
+    from app.services.scenarios import q1, q2, q3, q5, q6
 
     router = APIRouter()
 
@@ -105,18 +109,17 @@ def create_router(require_login, get_db) -> APIRouter:
         )
         messages = build_messages(previous, body.message)
 
-        if body.mode == "q5":
-            system = await q5.build_prompt(body.message)
-        elif body.mode == "q6":
-            system = await q6.build_prompt(body.message)
-        elif body.mode == "q1":
-            from app.services.scenarios import q1
-
+        if body.mode == "q1":
             system = await q1.build_prompt(body.message)
-        elif body.mode == "q4":
-            from app.services.scenarios import q3
-
+        elif body.mode == "q2":
+            # 이전 질문에 담긴 업로드 주제를 이어서 쓸 수 있게 문맥으로 넘긴다.
+            system = await q2.build_prompt(body.message, context=[chat.question for chat in reversed(previous)])
+        elif body.mode == "q3":
             system = await q3.build_prompt(body.message, body.keyword)
+        elif body.mode == "q4":
+            system = await q5.build_prompt(body.message)
+        elif body.mode == "q5":
+            system = await q6.build_prompt(body.message)
         else:
             system = (
                 "당신은 경제·AI 숏폼 제작자의 도우미입니다. 한국어로 간결하게 답하세요. "

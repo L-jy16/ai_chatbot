@@ -15,8 +15,9 @@ class Chat(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     mode: Mapped[str] = mapped_column(String(10), nullable=False)
-    # 1: 이전 C 모드 번호, 2: B의 Q1~Q5 번호, 3: C 모드 번호로 재통합
-    scenario_version: Mapped[int] = mapped_column(default=3, server_default="3", nullable=False)
+    # mode 번호 체계. 1: 이전 계획서 번호(q4=타이밍, q5=새로운 각도, q6=다음 편),
+    # 2: 화면(D)의 Q1~Q5 번호(현재), 3: C 재통합 중 쓰인 번호(1과 같은 의미)
+    scenario_version: Mapped[int] = mapped_column(default=2, server_default="2", nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(10), nullable=False)

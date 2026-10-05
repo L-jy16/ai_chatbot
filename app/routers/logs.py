@@ -24,10 +24,10 @@ class ChatLog(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_mode(cls, value):
-        # B가 사용한 Q1~Q5 번호의 기록을 현재 C 화면의 번호로 표시한다.
-        if getattr(value, "scenario_version", 1) == 2:
+        # 계획서 번호(버전 1·3)로 저장된 기록을 현재 화면(D)의 Q1~Q5 번호로 표시한다.
+        if getattr(value, "scenario_version", 2) in (1, 3):
             row = {name: getattr(value, name) for name in cls.model_fields}
-            row["mode"] = {"q3": "q4", "q4": "q5", "q5": "q6"}.get(row["mode"], row["mode"])
+            row["mode"] = {"q4": "q3", "q5": "q4", "q6": "q5"}.get(row["mode"], row["mode"])
             return row
         return value
 

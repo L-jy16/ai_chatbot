@@ -25,7 +25,7 @@ def test_chat_trims_question_before_length_check():
     assert request.message == "오늘 주제"
 
 
-@pytest.mark.parametrize("mode", ["q2", "Q5", "", 42])
+@pytest.mark.parametrize("mode", ["q6", "q7", "Q5", "", 42])
 def test_chat_rejects_unowned_or_unknown_mode(mode):
     with pytest.raises(ValidationError):
         ChatRequest(mode=mode, message="질문")

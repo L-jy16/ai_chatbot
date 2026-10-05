@@ -96,25 +96,79 @@ def test_chat_saves_answer_for_authenticated_user(chat_app):
         assert row.created_at is not None
 
 
-def test_b_trend_prompts_use_c_mode_numbers(chat_app, monkeypatch):
-    from app.services.scenarios import q1, q3
+def _labelled_prompt(label):
+    async def build_prompt(message, *args, **kwargs):
+        return label
 
-    async def today_prompt(message):
-        return "Q1 트렌드 근거"
+    return build_prompt
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_system"),
+    [
+        ("q1", "B 오늘의 주제"),
+        ("q2", "B 운영 채널 추천"),
+        ("q3", "B 타이밍 체크"),
+        ("q4", "C 새로운 각도"),
+        ("q5", "C 다음 편 기획"),
+    ],
+)
+def test_screen_modes_route_to_owner_scenarios(chat_app, monkeypatch, mode, expected_system):
+    # 화면(D)의 Q1~Q5 번호와 시나리오 파일 번호가 달라서 라우터가 대응시킨다.
+    from app.services.scenarios import q1, q2, q3
+
+    monkeypatch.setattr(q1, "build_prompt", _labelled_prompt("B 오늘의 주제"))
+    monkeypatch.setattr(q2, "build_prompt", _labelled_prompt("B 운영 채널 추천"))
+    monkeypatch.setattr(q3, "build_prompt", _labelled_prompt("B 타이밍 체크"))
+    monkeypatch.setattr(q5, "build_prompt", _labelled_prompt("C 새로운 각도"))
+    monkeypatch.setattr(q6, "build_prompt", _labelled_prompt("C 다음 편 기획"))
+    client, _, _, calls = chat_app
+
+    response = client.post("/api/chat", json={"mode": mode, "message": "질문"}, headers={"X-Test-User": "1"})
+
+    assert response.status_code == 200
+    assert calls[0][0] == expected_system
+
+
+def test_timing_check_passes_analysis_keyword(chat_app, monkeypatch):
+    from app.services.scenarios import q3
+
+    seen = {}
 
     async def timing_prompt(message, keyword=None):
-        assert keyword == "금리 인하"
-        return "Q4 타이밍 근거"
+        seen["keyword"] = keyword
+        return "B 타이밍 체크"
 
-    monkeypatch.setattr(q1, "build_prompt", today_prompt)
     monkeypatch.setattr(q3, "build_prompt", timing_prompt)
-    client, _, _, calls = chat_app
-    headers = {"X-Test-User": "1"}
-    assert client.post("/api/chat", json={"mode": "q1", "message": "오늘 주제"}, headers=headers).status_code == 200
-    assert client.post(
-        "/api/chat", json={"mode": "q4", "message": "지금 올려도 돼?", "keyword": "금리 인하"}, headers=headers
-    ).status_code == 200
-    assert [call[0] for call in calls] == ["Q1 트렌드 근거", "Q4 타이밍 근거"]
+    client, _, _, _ = chat_app
+    response = client.post(
+        "/api/chat", json={"mode": "q3", "message": "지금 올려도 돼?", "keyword": "금리 인하"},
+        headers={"X-Test-User": "1"},
+    )
+    assert response.status_code == 200
+    assert seen["keyword"] == "금리 인하"
+
+
+def test_channel_mode_reuses_previous_questions_as_context(chat_app, monkeypatch):
+    from app.services.scenarios import q2
+
+    seen = {}
+
+    async def channel_prompt(message, context=None):
+        seen["context"] = context
+        return "B 운영 채널 추천"
+
+    monkeypatch.setattr(q2, "build_prompt", channel_prompt)
+    client, Session, Chat, _ = chat_app
+    earlier = "최근 업로드 주제: 환율 상승\n질문: 오늘 뭐 올릴까?"
+    with Session() as db:
+        db.add(Chat(user_id=1, mode="q2", question=earlier, answer="답", status="success"))
+        db.commit()
+
+    response = client.post("/api/chat", json={"mode": "q2", "message": "이어서 추천해 줘"}, headers={"X-Test-User": "1"})
+
+    assert response.status_code == 200
+    assert seen["context"] == [earlier]
 
 
 def test_login_and_invalid_input_stop_before_ai(chat_app):
@@ -162,7 +216,7 @@ def test_ai_failure_is_saved_without_answer(chat_app, failure, code, saved_statu
     calls.failure = failure
 
     response = client.post(
-        "/api/chat", json={"mode": "q6", "message": "다음 편"}, headers={"X-Test-User": "1"}
+        "/api/chat", json={"mode": "q5", "message": "다음 편"}, headers={"X-Test-User": "1"}
     )
 
     assert response.status_code == http_status
