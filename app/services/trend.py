@@ -170,3 +170,66 @@ def _average_ratio(data: list[dict]) -> float:
         sum(values) / len(values),
         2,
     )
+    
+def compare_periods(keyword: str) -> dict:
+    """최근 7일과 이전 7일의 검색 추이를 비교합니다."""
+
+    keyword = keyword.strip()
+
+    if not keyword:
+        return {
+            "recent": 0.0,
+            "past": 0.0,
+            "trend": "stable",
+        }
+
+    today = datetime.now().date()
+
+    # 최근 7일
+    recent_end = today
+    recent_start = today - timedelta(days=6)
+
+    # 그 이전 7일
+    past_end = recent_start - timedelta(days=1)
+    past_start = past_end - timedelta(days=6)
+
+    data = _request_datalab(
+        keyword,
+        past_start.isoformat(),
+        recent_end.isoformat(),
+    )
+
+    recent_values = []
+    past_values = []
+
+    for item in data:
+        period = item.get("period", "")
+        ratio = float(item.get("ratio", 0))
+
+        try:
+            item_date = datetime.strptime(
+                period,
+                "%Y-%m-%d",
+            ).date()
+
+        except ValueError:
+            continue
+
+        if recent_start <= item_date <= recent_end:
+            recent_values.append(
+                {"ratio": ratio}
+            )
+
+        elif past_start <= item_date <= past_end:
+            past_values.append(
+                {"ratio": ratio}
+            )
+
+    recent = _average_ratio(recent_values)
+    past = _average_ratio(past_values)
+
+    return {
+        "recent": recent,
+        "past": past,
+        "trend": "stable",
+    }
