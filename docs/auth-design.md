@@ -156,7 +156,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 {"error": "INVALID_INPUT", "message": "비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요."}
 ```
 
-- **이메일**: `EmailStr`로 형식을 검사한다. 저장 전에 앞뒤 공백을 지우고 소문자로 바꾼다.
+- **이메일**: `email-validator`의 `validate_email(..., check_deliverability=False)`로 형식을 검사하고, 실패하면 `"올바른 이메일 형식이 아니에요."`로 응답한다. (`EmailStr`은 영어 메시지를 내므로 쓰지 않는다.) 저장 전에 앞뒤 공백을 지우고 소문자로 바꾼다.
 - **비밀번호**: 8자 이상, UTF-8 기준 72바이트 이하. 72바이트는 bcrypt가 처리할 수 있는 상한이다.
 - **중복 가입**: 먼저 조회해서 409로 막는다. 동시 요청으로 UNIQUE 제약 위반(`IntegrityError`)이 나도 rollback 후 409로 응답한다.
 - 가입 후 자동 로그인은 하지 않는다. 화면(D)은 가입 성공 시 `/login`으로 이동한다.
@@ -172,7 +172,9 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 {"error": "INVALID_CREDENTIALS", "message": "이메일 또는 비밀번호가 올바르지 않아요."}
 ```
 
-- 이메일은 형식 검사 없이 빈 값만 막는다(422). 형식이 이상하면 일치하는 사용자가 없으므로 401이 된다.
+- 이메일은 형식 검사 없이 빈 값만 막는다(422, `"이메일과 비밀번호를 입력해 주세요."`). 형식이 이상하면 일치하는 사용자가 없으므로 401이 된다.
+- 이메일은 가입 때와 같이 앞뒤 공백 제거·소문자 변환 후 조회한다.
+- 72바이트를 넘는 비밀번호는 가입될 수 없으므로 bcrypt에 넘기지 않고 바로 불일치(401)로 처리한다. bcrypt 5는 72바이트 초과 입력에 `ValueError`를 던지기 때문에, 그대로 넘기면 500이 된다.
 - 이메일이 없을 때와 비밀번호가 틀렸을 때 같은 401 메시지를 보낸다. 가입 여부가 노출되지 않게 하기 위해서다.
 - 성공하면 기존 세션을 비운 뒤 `session["user_id"] = user.id`만 저장한다.
 
@@ -211,7 +213,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 
 ## 7. 테스트
 
-- 도구: `pytest`, FastAPI `TestClient`.
+- 도구: `pytest`, FastAPI `TestClient`(Starlette 1.x는 `httpx2`가 필요하다).
 - `tests/conftest.py`:
   1. 앱 import 전에 테스트용 `SECRET_KEY` 환경 변수를 설정한다.
   2. 테스트마다 `tmp_path`에 임시 SQLite 파일을 만들고 `create_all`을 실행한다.
@@ -236,7 +238,7 @@ raise APIError(504, "AI_TIMEOUT", "현재 응답이 지연되고 있어요. 잠�
 - 예정 커밋:
   1. `docs(auth): A 파트 설계 문서 추가`
   2. `chore: .gitignore 추가`
-  3. `chore: requirements.txt 추가`
+  3. `chore: requirements.txt 및 pytest 설정 추가`
   4. `feat(config): 환경 변수 설정 및 .env.example 추가`
   5. `feat(db): SQLite 연결 및 Base, get_db 추가`
   6. `feat(core): 공통 에러 응답 형식 추가`
