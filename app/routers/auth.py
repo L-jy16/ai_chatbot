@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import require_login
 from app.errors import APIError
 from app.models import User
 from app.security import MAX_PASSWORD_BYTES, hash_password, verify_password
@@ -118,3 +119,9 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -
     request.session["user_id"] = user.id
     logger.info("login_success user_id=%s", user.id)
     return UserResponse(id=user.id, email=user.email)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(request: Request, user: User = Depends(require_login)) -> None:
+    request.session.clear()
+    logger.info("logout user_id=%s", user.id)
