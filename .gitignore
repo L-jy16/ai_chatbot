@@ -11,3 +11,4 @@ tmp/
 output/
 playwright-report/
 test-results/
+pytest-cache-files-*/
