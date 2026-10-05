@@ -1,9 +1,35 @@
 """C's chat request boundary and conversation helpers."""
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Protocol
+
 from pydantic import BaseModel, field_validator
 
 
 ALLOWED_MODES = {"q1", "q4", "q5", "q6", "free"}
+
+
+class CompletedChat(Protocol):
+    question: str
+    answer: str | None
+    status: str
+
+
+def build_messages(recent_first: Sequence[CompletedChat], question: str) -> list[dict[str, str]]:
+    """Turn up to five successful Q/A pairs into chronological LLM messages."""
+    completed = [chat for chat in recent_first if chat.status == "success" and chat.answer]
+    messages: list[dict[str, str]] = []
+    for chat in reversed(completed[:5]):
+        messages.extend(
+            [
+                {"role": "user", "content": chat.question},
+                {"role": "assistant", "content": chat.answer or ""},
+            ]
+        )
+    messages.append({"role": "user", "content": question})
+    return messages
 
 
 class ChatRequest(BaseModel):
