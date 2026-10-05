@@ -40,7 +40,27 @@ def test_llm_sends_one_server_side_request(monkeypatch):
     body = json.loads(calls[0].content)
     assert body["model"] == "gpt-5-mini"
     assert [item["role"] for item in body["messages"]] == ["system", "user"]
-    assert body["max_completion_tokens"] == 1200
+    assert body["max_completion_tokens"] == 4000
+
+
+def test_llm_leaves_room_for_reasoning_tokens(monkeypatch):
+    # gpt-5-mini는 답변을 쓰기 전에 추론 토큰을 먼저 쓴다. 실제 API에서 한도 1200이면
+    # 추론에 다 써서 content=""·finish_reason=length가 왔고, 4000이면 1712토큰으로 정상 답변했다.
+    reasoning_tokens, answer_tokens = 1700, 300
+
+    def respond(request):
+        budget = json.loads(request.content)["max_completion_tokens"]
+        if budget < reasoning_tokens + answer_tokens:
+            choice = {"message": {"content": ""}, "finish_reason": "length"}
+        else:
+            choice = {"message": {"content": "추천 답변"}, "finish_reason": "stop"}
+        return httpx.Response(200, json={"choices": [choice]})
+
+    transport = httpx.MockTransport(respond)
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs))
+
+    assert asyncio.run(ask_llm("시스템", [{"role": "user", "content": "질문"}])) == "추천 답변"
 
 
 @pytest.mark.parametrize(

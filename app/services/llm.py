@@ -14,6 +14,10 @@ class AIServiceError(Exception):
 # Keep the name used by B's integration tests and call sites.
 AIError = AIServiceError
 
+# gpt-5-mini는 답변 전에 추론 토큰을 먼저 쓴다. 1200이면 추론에 다 써서 빈 답변이 온다.
+# (실제 측정: 한도 1200 → content="", finish_reason=length / 한도 4000 → 1712토큰으로 정상 답변)
+MAX_COMPLETION_TOKENS = 4000
+
 
 async def ask_llm(system: str, messages: list[dict]) -> str:
     """Send one request. Never expose the provider key to the browser."""
@@ -34,7 +38,7 @@ async def ask_llm(system: str, messages: list[dict]) -> str:
     payload = {
         "model": model,
         "messages": [{"role": "system", "content": system}, *messages],
-        "max_completion_tokens": 1200,
+        "max_completion_tokens": MAX_COMPLETION_TOKENS,
     }
 
     try:
