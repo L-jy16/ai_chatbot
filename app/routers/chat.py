@@ -126,9 +126,10 @@ def create_router(require_login, get_db) -> APIRouter:
         chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status=status)
         try:
             db.add(chat)
+            db.flush()
+            chat_id = chat.id
             db.commit()
-            db.refresh(chat)
-            logger.info("db_save_success user_id=%s chat_id=%s status=%s", user.id, chat.id, status)
+            logger.info("db_save_success user_id=%s chat_id=%s status=%s", user.id, chat_id, status)
         except SQLAlchemyError:
             db.rollback()
             logger.exception("db_save_fail user_id=%s mode=%s", user.id, body.mode)
@@ -147,6 +148,6 @@ def create_router(require_login, get_db) -> APIRouter:
                 status_code=502,
                 content={"error": "AI_ERROR", "message": "AI 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요."},
             )
-        return {"chat_id": chat.id, "answer": answer}
+        return {"chat_id": chat_id, "answer": answer}
 
     return router
