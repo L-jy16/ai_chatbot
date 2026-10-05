@@ -87,3 +87,16 @@ def search_news(
         )
 
         return []
+    
+def get_hot_issues(limit: int = 10) -> list[dict]:
+    """최신 경제 뉴스를 오늘의 경제 이슈로 반환합니다."""
+
+    if limit < 1:
+        return []
+
+    issues = search_news(
+        query="경제",
+        display=min(limit, 100),
+    )
+
+    return issues[:limit]
