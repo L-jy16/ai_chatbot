@@ -1,7 +1,9 @@
 import os
 
-# app.config는 import 시점에 Settings()를 만들므로, 앱을 import하기 전에 테스트용 키를 넣는다.
+# app.config는 import 시점에 Settings()를 만들므로, 앱을 import하기 전에 테스트용 값을 넣는다.
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-only"
+# 앱 기본 엔진은 메모리 DB로 둔다. `with client:`로 lifespan이 돌아도 실제 ./app.db가 생기지 않는다.
+os.environ["DATABASE_URL"] = "sqlite://"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
