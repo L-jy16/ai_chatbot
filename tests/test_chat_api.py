@@ -249,3 +249,14 @@ def test_db_failure_never_returns_success(chat_app, monkeypatch):
         "/api/chat", json={"mode": "q5", "message": "다음 질문"}, headers={"X-Test-User": "1"}
     )
     assert next_response.status_code == 200
+
+
+def test_ai_failure_log_keeps_reason_for_tracing(chat_app, caplog):
+    # 로그만 보고 원인을 추적할 수 있어야 한다. 사유는 우리 코드가 정한 문구이며 키·원본 응답은 넣지 않는다.
+    client, _, _, calls = chat_app
+    calls.failure = llm.AIServiceError("AI response is empty")
+    caplog.set_level("WARNING", logger="app.routers.chat")
+
+    client.post("/api/chat", json={"mode": "q4", "message": "질문"}, headers={"X-Test-User": "1"})
+
+    assert any("ai_call_fail" in m and "detail=AI response is empty" in m for m in caplog.messages)

@@ -135,9 +135,10 @@ def create_router(require_login, get_db) -> APIRouter:
         except AITimeoutError:
             status = "timeout"
             logger.warning("ai_call_fail user_id=%s mode=%s reason=timeout", user.id, body.mode)
-        except AIServiceError:
+        except AIServiceError as exc:
             status = "error"
-            logger.warning("ai_call_fail user_id=%s mode=%s reason=provider", user.id, body.mode)
+            # detail은 llm.py가 정한 사유 문구라 키나 외부 응답 본문이 들어가지 않는다.
+            logger.warning("ai_call_fail user_id=%s mode=%s reason=provider detail=%s", user.id, body.mode, exc)
 
         chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status=status)
         try:
