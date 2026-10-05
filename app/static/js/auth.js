@@ -13,6 +13,10 @@ form.addEventListener('submit', async (event) => {
     showError(errorBox, '비밀번호 확인이 일치하지 않습니다.');
     return;
   }
+  if (form.dataset.action === 'signup' && new TextEncoder().encode(password).length > 72) {
+    showError(errorBox, '비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요.');
+    return;
+  }
   button.disabled = true;
   const label = button.textContent;
   button.textContent = '잠시만 기다려 주세요…';

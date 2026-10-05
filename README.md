@@ -2,7 +2,7 @@
 
 유튜브 경제·AI 숏폼 제작자가 오늘의 주제, 게시 타이밍, 새로운 관점, 후속 시리즈를 질문하는 FastAPI 서비스입니다. 최근·과거 트렌드 데이터를 서버의 LLM 프롬프트에 넣는 구조를 목표로 합니다.
 
-**현재 상태:** 최신 `origin/develop`의 A 기반·인증 코드와 D의 UI·로그 조회·SQL·문서를 통합했습니다. A의 실제 회원가입·로그인·로그아웃 API와 users DB는 구현되어 있습니다. B의 네이버 데이터와 C의 Chat·AI 코드는 아직 develop에 포함되지 않았으므로, 전체 화면은 독립 데모로 검증합니다. 실제 앱에 D 화면·로그 API를 등록하는 작업은 C의 Chat 모델 준비 후 진행합니다. **배포는 사용자 요청으로 제외했습니다.**
+**현재 상태:** D 화면을 A의 실제 회원가입·로그인·로그아웃 API와 users DB에 연결했습니다. `app.main:app`에서 실제 계정을 만들고 로그인 후 채팅·기록 화면에 접근할 수 있습니다. 페이지 접근은 A의 DB 사용자 조회로 검사합니다. B의 데이터와 C의 Chat·AI 코드는 아직 develop에 없어 채팅·기록 기능은 503과 준비 중 안내를 반환합니다. 별도 데모에서는 예시 채팅을 확인할 수 있습니다. **배포는 사용자 요청으로 제외했습니다.**
 
 ## D 구현 범위
 
@@ -73,7 +73,7 @@ Linux/macOS에서는 `cp .env.example .env`, `.venv/bin/python`을 사용합니�
 - 상태 확인: `GET http://127.0.0.1:8000/health` → `{"status":"ok"}`.
 - API 문서: `http://127.0.0.1:8000/docs`.
 - 실제 인증: 가입 201, 로그인 200과 세션 쿠키, 로그아웃 204(응답 본문 없음).
-- 현재 A 앱에는 D 페이지·Chat 모델이 등록되지 않았습니다. 전체 UI 확인은 위의 `dev.demo_app:app`을 사용합니다.
+- 실제 가입 화면: `http://127.0.0.1:8000/signup`. 로그인 후 D 화면으로 이동하며 실제 A 세션을 사용합니다. Chat 모델 미연결 상태에서는 채팅 전송을 비활성화하고 기록에 준비 중 안내를 표시합니다.
 
 ## 구조와 담당
 
@@ -108,20 +108,21 @@ tests/test_ui.py                       # D: API·SQL 검사
 
 ## A·C 코드에 연결
 
-FastAPI 앱, SessionMiddleware, `require_login`, 동기 SQLAlchemy `get_db`는 A 코드에 준비되어 있습니다. C의 `Chat` 모델이 준비되면 A의 `main.py`에 한 번 등록합니다.
+`main.py`에서 `install_ui()`를 호출해 실제 인증과 D 페이지를 이미 등록했습니다. `get_current_user`를 전달해 페이지에서도 삭제된 사용자를 확인합니다. C의 `Chat` 모델과 채팅 라우터가 준비되면 기존 등록 호출을 다음처럼 변경합니다. 호출을 추가하지 않습니다.
 
 ```python
 # A의 실제 의존성과 C가 구현할 Chat을 사용합니다.
 from app.database import get_db
-from app.dependencies import require_login
+from app.dependencies import get_current_user, require_login
 from app.models.chat import Chat
 from app.ui import install_ui
 
-# A가 생성하고 SessionMiddleware를 설정한 app에 등록
-install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
+# 기존 install_ui 호출을 교체하고 C의 /api/chat 라우터도 등록
+install_ui(app, require_login=require_login, get_db=get_db,
+           get_current_user=get_current_user, chat_model=Chat)
 ```
 
-`install_ui()`가 `/static`, 페이지, 로그 API를 등록합니다. 중복 등록은 오류로 알립니다. 실제 앱은 통합 후 `app.main:app`으로 실행합니다.
+`install_ui()`는 `/static`과 페이지를 등록합니다. Chat을 전달하면 실제 로그 API를 등록하고, 생략하면 인증 후 503을 반환하는 채팅·기록 준비 중 경로를 등록합니다. 중복 호출은 오류로 알립니다. C 연결 시 앱을 새로 시작해 준비 중 경로를 실제 라우터로 바꿉니다. 실제 앱 실행 대상은 `app.main:app`입니다.
 
 팀과 합의할 추가 계약:
 
@@ -132,13 +133,13 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 - `get_db()`는 **동기 SQLAlchemy Session**을 yield하고 닫습니다. AsyncSession은 현재 로그 라우터와 호환되지 않습니다.
 - C의 `Chat`은 `id`, `user_id`, `mode`, `question`, nullable `answer`, `status`, `created_at` 속성을 갖습니다.
 - 실제 인증 요청은 JSON `{email, password}`입니다. 로그인은 200 및 세션 쿠키, 가입은 201 후 로그인 화면으로 이동하고 로그아웃은 204입니다.
-- 가입 화면은 비밀번호 8~128자를 검사하며 A의 서버는 최종적으로 8자 이상·UTF-8 72바이트 이하를 검증합니다. 바이트 제한을 넘으면 서버 오류 안내를 표시합니다. 클라이언트 검증은 서버 검증을 대신하지 않습니다.
+- 가입 화면과 A의 서버는 비밀번호 8자 이상·UTF-8 72바이트 이하를 검증합니다. 화면에서도 한글 등 멀티바이트 입력을 검사합니다. 서버 검증은 별도로 유지합니다.
 - C의 AI timeout은 브라우저 제한 65초보다 짧게 설정합니다. 브라우저 연결이 끊겨도 서버가 저장할 수 있어 시간 초과 안내는 내 기록 확인을 요청합니다.
 - API 오류는 `{error, message}`를 우선 사용합니다. 문자열 `detail`과 FastAPI 검증 오류 배열도 표시합니다.
 
 ## API 명세
 
-인증은 A의 실제 구현, 채팅은 C의 **팀 계약**, 내 기록은 D의 실제 라우터 구현입니다. D 라우터 등록과 실제 Chat 연결은 대기 상태이며 데모 대체 동작과 구분합니다.
+인증·페이지는 A와 D가 실제 연결되어 있습니다. Chat·채팅은 C의 **팀 계약**으로 대기 상태입니다. 실제 앱의 `/api/chat`과 `/api/me/chats`는 로그인 전 401, 로그인 후 준비 중 503입니다. C 모델 연결 후 D의 실제 로그 조회를 등록합니다. 데모와 구분합니다.
 
 | 메서드 | 경로 | 인증 | 설명 / 담당 |
 | --- | --- | --- | --- |
@@ -254,6 +255,8 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 
 D의 **40개 테스트**는 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 다섯 모드 저장·조회, Q2 업로드 맥락·추가 질문, timeout/error 후 재시도, SQL 읽기 전용을 검증합니다. `pytest`는 원격 A의 인증·설정·DB·보안 테스트도 함께 실행합니다. 테스트는 임시 SQLite를 사용하며 실제 `app.db`를 수정하지 않습니다. `tests/conftest.py`에서 외부 API 키를 비워 유료 호출을 방지합니다. A의 `httpx2` 의존성도 유지합니다.
 
+A/D 실제 인증 연결 테스트 6개를 추가하여 **전체 125개 테스트 통과**. 실제 가입→DB 저장→로그인→페이지 접근→204 로그아웃, 삭제된 계정 차단, 미연결 API의 401/503을 확인했습니다.
+
 브라우저 검사(선택 사항, 별도 터미널에서 데모 실행):
 
 ```powershell
@@ -265,7 +268,15 @@ D의 **40개 테스트**는 비로그인·변조 세션 차단, 사용자별 기
 ./.venv/Scripts/python.exe dev/check_ui_browser.py
 ```
 
-인증 화면·다섯 모드 payload·Q2 업로드 주제와 총 길이 제한·timeout 입력 유지·응답 HTML 비실행·기록 빈/오류 상태·로그아웃·375px 모바일 가로 넘침을 검사합니다. 캡처는 `output/ui/`에 생성됩니다. 이번 검증은 Windows headless Chrome으로 통과했습니다. 실제 인증·네이버·LLM·영구 DB 검증은 팀 통합 후 필요합니다.
+데모 검사는 다섯 모드 payload·Q2 업로드 주제와 총 길이 제한·timeout 입력 유지·응답 HTML 비실행·기록 빈/오류 상태·375px 모바일을 확인합니다. 캡처는 `output/ui/`에 생성됩니다.
+
+실제 인증 브라우저 검사는 **테스트용 DB로 실행한 실제 A 앱**에 대해 다음처럼 수행합니다. 검사 과정에서 테스트 계정이 만들어지므로 운영 DB가 아닌 별도 SQLite를 사용합니다.
+
+```powershell
+./.venv/Scripts/python.exe dev/check_auth_browser.py --channel chrome --base-url http://127.0.0.1:8001
+```
+
+실제 회원가입·72바이트 검사·틀린 로그인·성공 로그인·D 페이지·204 로그아웃·모바일 검증을 Windows headless Chrome으로 통과했습니다. 네이버·LLM·실제 chats 저장은 C 연결 후 검증해야 합니다.
 
 ## 팀 역할·개인별 작업 요약
 
@@ -276,7 +287,7 @@ D의 **40개 테스트**는 비로그인·변조 세션 차단, 사용자별 기
 | A | feature/auth | 기반, config, DB, User, 회원가입·세션 / origin/develop에서 통합 |
 | B | feature/trend | 네이버, 추이 비교, Q1·Q3 데이터 / 코드 대기, Q2 연계는 팀 합의 |
 | C | feature/chat | Chat, LLM, 컨텍스트, mode, 저장, Q4·Q5 / 코드 대기, Q2 대화 흐름 추가 필요 |
-| D | feature/ui | 4개 화면·공통 스타일, 다섯 모드·Q2 업로드 맥락·오류·대기, 기록 API·SQL, 데모·테스트·통합 문서 완료. 배포 제외 |
+| D | feature/ui | 4개 화면·공통 스타일, A 실제 인증 연결, 다섯 모드·Q2 맥락·오류·대기, 기록 라우터·SQL, 데모·검증·문서 완료. C 기록 연결 대기. 배포 제외 |
 
 D의 변경은 `feature/ui`에 기능별 커밋으로 기록했습니다. `git log --oneline feature/ui`로 확인합니다. 팀 협업 계획은 `feature/* → develop → main`, PR 기반 merge commit, 팀원 1명 이상 승인입니다. [D PR #4](https://github.com/L-jy16/ai_chatbot/pull/4)는 develop 대상이며 최신 origin/develop을 feature/ui에 합쳐 공통 설정·문서 충돌을 해결했습니다. develop PR의 최종 승인은 팀 리뷰로 진행합니다. A의 세부 설계는 [auth-design.md](docs/auth-design.md), D 전달서는 [D_HANDOFF.md](docs/D_HANDOFF.md)를 참고하세요.
 

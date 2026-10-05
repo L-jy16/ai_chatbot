@@ -12,13 +12,14 @@
 
 ## A와 연결
 
-1. `requirements-ui.txt`를 팀 의존성에 반영합니다.
-2. SessionMiddleware를 설정하고 세션 `user_id`에 양의 정수를 저장합니다.
-3. `require_login`이 사용자·인증 유효성을 검사하고 int/User/`{"id": int}`를 반환하게 합니다.
-4. 동기 SQLAlchemy Session을 yield하는 `get_db`를 연결합니다.
-5. `main.py`에서 README의 `install_ui()`를 한 번 호출합니다. 페이지·static·로그를 중복 등록하지 않습니다.
-6. JSON `{email, password}`와 비밀번호 정책을 맞춥니다.
-7. `.env.example`은 제안 이름입니다. 실제 config와 맞추고 데모의 임시 세션 키는 사용하지 않습니다.
+실제 연결을 완료했습니다. `app.main:app`에서 D 페이지·정적 파일과 A의 가입·로그인·로그아웃을 사용할 수 있습니다.
+
+1. `main.py`에서 `install_ui()`를 한 번 호출합니다. A의 `get_current_user`, `require_login`, 동기 `get_db`를 전달합니다.
+2. 페이지는 DB의 사용자 존재까지 확인하며 삭제된 계정은 로그인 화면으로 돌아갑니다.
+3. 가입은 201, 로그인은 세션 발급 후 200, 로그아웃은 204를 화면에서 처리합니다.
+4. 화면과 서버 모두 비밀번호 8자 이상·UTF-8 72바이트 이하를 검사합니다.
+5. `requirements.txt`에 Jinja2를 반영했고 `.env.example`은 A의 `SECRET_KEY` 설정을 사용합니다.
+6. C 모델이 없을 때 실제 앱의 채팅·기록 API는 인증을 검사한 뒤 503과 준비 중 안내를 반환합니다. 데모 응답을 실제 앱에 넣지 않습니다.
 
 ## C와 연결
 
@@ -27,21 +28,24 @@
 1. Chat의 계획서 필드를 구현하고 실패 시 nullable `answer`를 허용합니다.
 2. `/api/chat`의 `{mode, message}` → `{chat_id, answer}` 계약을 맞춥니다.
 3. 실패 상태·DB 저장을 유지합니다. 화면은 `message`/문자열 `detail`을 표시합니다.
-4. 실제 Chat을 `install_ui()`에 주입합니다. 데모 모델을 import하지 않습니다.
+4. `main.py`의 기존 `install_ui()` 호출에 실제 Chat을 주입하고 C 채팅 라우터를 등록합니다. 중복 호출하지 않으며 앱 재시작으로 준비 중 경로를 교체합니다. 데모 모델을 import하지 않습니다.
 5. AI timeout은 65초 미만으로 설정하고 DB timestamp 시간대를 A와 합의합니다.
 
 ## 검증 근거
 
 - pytest 40개 통과: 인증 차단·사용자 분리·limit·null·DB 실패·다섯 모드·Q2 맥락·SQL.
+- A/D 실제 연결 테스트 6개 포함 전체 125개 통과. 실제 DB 계정·페이지·삭제된 사용자·204 로그아웃·준비 중 API 확인.
+- `dev/check_auth_browser.py`: 격리 DB의 실제 A 앱에서 가입·72바이트 검증·로그인·D 페이지·모바일·204 로그아웃 통과.
 - 별도 headless Chrome: 인증 화면·모드 payload·실패 복구·HTML 비실행·기록 상태·모바일·로그아웃.
 - `output/ui/`: 로컬 캡처. Git에는 포함하지 않습니다.
 
 ## 통합 후 확인
 
-- [ ] 실제 회원가입·로그인과 두 실제 계정의 기록 분리.
+- [x] 실제 회원가입·로그인·페이지 접근·로그아웃 및 삭제된 계정 차단.
+- [ ] C 연결 후 두 실제 계정의 대화 기록 분리.
 - [ ] 네이버·LLM 연결 후 다섯 시나리오 실제 응답.
 - [ ] 성공/timeout/error를 영구 DB·API·화면·SQL에서 대조.
 - [ ] 최근 대화 컨텍스트·서버 핵심 로그 확인.
 - [ ] develop PR·리뷰·merge commit, 개인별 커밋·실제 작업자 확인.
 
-A/B/C 코드가 없어 위 항목은 대기 상태입니다. 배포·URL 검증은 범위에서 제외했습니다.
+A 인증과 D 화면은 연결됐습니다. B/C 데이터·AI·대화 저장은 develop 통합 후 확인합니다. 배포·URL 검증은 범위에서 제외했습니다.

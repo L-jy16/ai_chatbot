@@ -24,7 +24,7 @@
   {% endif %}
   </nav>
 </header>
-{% if demo_mode %}<div class="demo-banner">미리보기 모드 · 예시 데이터와 응답입니다. 실제 뉴스·AI API에 연결되어 있지 않습니다.</div>{% endif %}
+{% if demo_mode %}<div class="demo-banner">미리보기 모드 · 예시 데이터와 응답입니다. 실제 뉴스·AI API에 연결되어 있지 않습니다.</div>{% elif backend_pending %}<div class="demo-banner">계정 기능을 사용할 수 있습니다. 채팅과 대화 기록 기능은 준비 중입니다.</div>{% endif %}
 <main id="main" class="page-shell">{% block content %}{% endblock %}</main>
 <p id="global-error" class="global-error" role="alert" hidden></p>
 <footer class="site-footer"><span>PULSE / CREATOR WORKSPACE</span><span>흐름을 읽고, 나만의 이야기를 만드세요.</span></footer>

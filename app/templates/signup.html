@@ -13,8 +13,8 @@
     {% if demo_mode %}<p class="demo-credentials">현재는 화면 미리보기입니다. 실제 회원가입은 A의 인증 API를 연결해야 합니다. <a href="/login">예시 계정으로 로그인하기</a></p>{% endif %}
     <form id="auth-form" data-action="signup">
       <div class="field"><label for="email">이메일</label><input id="email" name="email" type="email" autocomplete="username" required maxlength="254" placeholder="creator@example.com"></div>
-      <div class="field"><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" aria-describedby="password-help" placeholder="8자 이상 입력하세요"><p id="password-help" class="field-help">8~128자. 서버의 인증 정책도 적용됩니다.</p></div>
-      <div class="field"><label for="password-confirm">비밀번호 확인</label><input id="password-confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="비밀번호를 다시 입력하세요"></div>
+      <div class="field"><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="72" aria-describedby="password-help" placeholder="8자 이상 입력하세요"><p id="password-help" class="field-help">8자 이상, UTF-8 기준 72바이트 이하.</p></div>
+      <div class="field"><label for="password-confirm">비밀번호 확인</label><input id="password-confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="72" placeholder="비밀번호를 다시 입력하세요"></div>
       <p id="form-error" class="error-message" role="alert" hidden></p>
       <button class="button" id="auth-submit" type="submit">계정 만들기 ↗</button>
     </form>
