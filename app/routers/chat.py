@@ -8,6 +8,7 @@ from typing import Protocol
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
@@ -64,7 +65,7 @@ class ChatRequest(BaseModel):
 def create_router(require_login, get_db) -> APIRouter:
     """Register C's route with A's actual authentication and DB dependencies."""
     from app.models.chat import Chat
-    from app.services.llm import ask_llm
+    from app.services.llm import AIServiceError, AITimeoutError, ask_llm
     from app.services.scenarios import q5, q6
 
     router = APIRouter()
@@ -106,11 +107,37 @@ def create_router(require_login, get_db) -> APIRouter:
                 "주어진 자료가 없으면 최신 이슈·검색 추이를 확인하지 못했다고 밝히고 지어내지 마세요."
             )
 
-        answer = await ask_llm(system, messages)
-        chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status="success")
-        db.add(chat)
-        db.commit()
-        db.refresh(chat)
+        answer: str | None = None
+        status = "success"
+        try:
+            answer = await ask_llm(system, messages)
+        except AITimeoutError:
+            status = "timeout"
+        except AIServiceError:
+            status = "error"
+
+        chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status=status)
+        try:
+            db.add(chat)
+            db.commit()
+            db.refresh(chat)
+        except SQLAlchemyError:
+            db.rollback()
+            return JSONResponse(
+                status_code=500,
+                content={"error": "DB_ERROR", "message": "대화 기록을 저장하지 못했습니다."},
+            )
+
+        if status == "timeout":
+            return JSONResponse(
+                status_code=504,
+                content={"error": "AI_TIMEOUT", "message": "현재 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요."},
+            )
+        if status == "error":
+            return JSONResponse(
+                status_code=502,
+                content={"error": "AI_ERROR", "message": "AI 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요."},
+            )
         return {"chat_id": chat.id, "answer": answer}
 
     return router
