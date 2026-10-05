@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import Session
 
 
 ALLOWED_MODES = {"q1", "q4", "q5", "q6", "free"}
@@ -56,3 +59,58 @@ class ChatRequest(BaseModel):
         if not 1 <= len(value) <= 500:
             raise ValueError("질문은 1~500자로 입력해 주세요.")
         return value
+
+
+def create_router(require_login, get_db) -> APIRouter:
+    """Register C's route with A's actual authentication and DB dependencies."""
+    from app.models.chat import Chat
+    from app.services.llm import ask_llm
+    from app.services.scenarios import q5, q6
+
+    router = APIRouter()
+
+    @router.post("/api/chat")
+    async def post_chat(request: Request, user=Depends(require_login), db: Session = Depends(get_db)):
+        try:
+            body = ChatRequest.model_validate(await request.json())
+        except (ValueError, TypeError):
+            return JSONResponse(
+                status_code=422,
+                content={"error": "INVALID_INPUT", "message": "질문은 1~500자로 입력해 주세요."},
+            )
+
+        previous = (
+            db.query(Chat)
+            .filter(Chat.user_id == user.id, Chat.status == "success", Chat.answer.is_not(None))
+            .order_by(Chat.created_at.desc(), Chat.id.desc())
+            .limit(5)
+            .all()
+        )
+        messages = build_messages(previous, body.message)
+
+        if body.mode == "q5":
+            system = await q5.build_prompt(body.message)
+        elif body.mode == "q6":
+            system = await q6.build_prompt(body.message)
+        elif body.mode == "q1":
+            from app.services.scenarios import q1
+
+            system = await q1.build_prompt(body.message)
+        elif body.mode == "q4":
+            from app.services.scenarios import q4
+
+            system = await q4.build_prompt(body.message)
+        else:
+            system = (
+                "당신은 경제·AI 숏폼 제작자의 도우미입니다. 한국어로 간결하게 답하세요. "
+                "주어진 자료가 없으면 최신 이슈·검색 추이를 확인하지 못했다고 밝히고 지어내지 마세요."
+            )
+
+        answer = await ask_llm(system, messages)
+        chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status="success")
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+        return {"chat_id": chat.id, "answer": answer}
+
+    return router
