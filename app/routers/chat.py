@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 
 
 ALLOWED_MODES = {"q1", "q4", "q5", "q6", "free"}
+logger = logging.getLogger(__name__)
 
 
 class CompletedChat(Protocol):
@@ -72,6 +74,7 @@ def create_router(require_login, get_db) -> APIRouter:
 
     @router.post("/api/chat")
     async def post_chat(request: Request, user=Depends(require_login), db: Session = Depends(get_db)):
+        logger.info("request_received user_id=%s", user.id)
         try:
             body = ChatRequest.model_validate(await request.json())
         except (ValueError, TypeError):
@@ -110,19 +113,25 @@ def create_router(require_login, get_db) -> APIRouter:
         answer: str | None = None
         status = "success"
         try:
+            logger.info("ai_call_start user_id=%s mode=%s", user.id, body.mode)
             answer = await ask_llm(system, messages)
+            logger.info("ai_call_success user_id=%s mode=%s", user.id, body.mode)
         except AITimeoutError:
             status = "timeout"
+            logger.warning("ai_call_fail user_id=%s mode=%s reason=timeout", user.id, body.mode)
         except AIServiceError:
             status = "error"
+            logger.warning("ai_call_fail user_id=%s mode=%s reason=provider", user.id, body.mode)
 
         chat = Chat(user_id=user.id, mode=body.mode, question=body.message, answer=answer, status=status)
         try:
             db.add(chat)
             db.commit()
             db.refresh(chat)
+            logger.info("db_save_success user_id=%s chat_id=%s status=%s", user.id, chat.id, status)
         except SQLAlchemyError:
             db.rollback()
+            logger.exception("db_save_fail user_id=%s mode=%s", user.id, body.mode)
             return JSONResponse(
                 status_code=500,
                 content={"error": "DB_ERROR", "message": "대화 기록을 저장하지 못했습니다."},
