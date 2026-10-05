@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}회원가입{% endblock %}
+{% block content %}
+<div class="auth-layout">
+  <section class="auth-story">
+    <p class="eyebrow">MAKE YOUR NEXT MOVE</p>
+    <h1>좋은 주제는<br>좋은 질문에서.</h1>
+    <p class="muted">지금 뜨는 이슈를 발견하고, 익숙한 주제를 새롭게.<br>주제 탐색부터 시리즈 기획까지 한곳에서 시작하세요.</p>
+    <div class="orbit-art" aria-hidden="true"><span>YOUR NEXT MOVE ↗</span></div>
+  </section>
+  <section class="card auth-card" aria-labelledby="auth-title">
+    <h2 id="auth-title">나만의 작업실 만들기</h2><p class="muted">이메일과 비밀번호로 간단하게 시작하세요.</p>
+    {% if demo_mode %}<p class="demo-credentials">현재는 화면 미리보기입니다. 실제 회원가입은 A의 인증 API를 연결해야 합니다. <a href="/login">예시 계정으로 로그인하기</a></p>{% endif %}
+    <form id="auth-form" data-action="signup">
+      <div class="field"><label for="email">이메일</label><input id="email" name="email" type="email" autocomplete="username" required maxlength="254" placeholder="creator@example.com"></div>
+      <div class="field"><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" aria-describedby="password-help" placeholder="8자 이상 입력하세요"><p id="password-help" class="field-help">8~128자. 서버의 인증 정책도 적용됩니다.</p></div>
+      <div class="field"><label for="password-confirm">비밀번호 확인</label><input id="password-confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="비밀번호를 다시 입력하세요"></div>
+      <p id="form-error" class="error-message" role="alert" hidden></p>
+      <button class="button" id="auth-submit" type="submit">계정 만들기 ↗</button>
+    </form>
+    <p class="auth-switch">이미 계정이 있나요? <a href="/login">로그인</a></p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', path='js/auth.js') }}"></script>{% endblock %}
