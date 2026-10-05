@@ -151,3 +151,22 @@ def _request_datalab(
         )
 
         return []
+    
+def _average_ratio(data: list[dict]) -> float:
+    """검색 추이 ratio의 평균을 계산합니다."""
+
+    if not data:
+        return 0.0
+
+    values = [
+        float(item.get("ratio", 0))
+        for item in data
+    ]
+
+    if not values:
+        return 0.0
+
+    return round(
+        sum(values) / len(values),
+        2,
+    )
