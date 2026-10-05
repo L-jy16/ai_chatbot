@@ -1,14 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import models  # noqa: F401  모델을 Base에 등록해 create_all 대상이 되게 한다
 from app.config import settings
 from app.database import Base, engine
 from app.errors import register_error_handlers
-from app.routers import auth
+from app.routers import auth, chat
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +34,15 @@ app.add_middleware(
 )
 register_error_handlers(app)
 app.include_router(auth.router)
+app.include_router(chat.router)
+
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
