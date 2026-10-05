@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app import models  # noqa: F401  모델을 Base에 등록해 create_all 대상이 되게 한다
 from app.config import settings
-from app.database import Base, engine, get_db
+from app.database import Base, engine, get_db, upgrade_chat_schema
 from app.dependencies import get_current_user, require_login
 from app.errors import register_error_handlers
 from app.models.chat import Chat
@@ -22,6 +22,7 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    upgrade_chat_schema(engine)
     Base.metadata.create_all(bind=engine)
     yield
 

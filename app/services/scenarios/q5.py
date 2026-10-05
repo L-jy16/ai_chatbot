@@ -1,5 +1,6 @@
 """Q5: reinterpret a familiar short-form topic from five angles."""
 
+import asyncio
 from collections.abc import Sequence
 from typing import Any
 
@@ -27,4 +28,5 @@ async def build_prompt(message: str) -> str:
     """Use B's trend source once it is available in the shared branch."""
     from app.services.trend import get_hot_issues
 
-    return render_prompt(message, get_hot_issues(limit=5))
+    issues = await asyncio.to_thread(get_hot_issues, limit=5)
+    return render_prompt(message, issues)

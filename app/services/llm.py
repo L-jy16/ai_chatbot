@@ -11,6 +11,10 @@ class AIServiceError(Exception):
     """The upstream service could not provide a usable answer."""
 
 
+# Keep the name used by B's integration tests and call sites.
+AIError = AIServiceError
+
+
 async def ask_llm(system: str, messages: list[dict]) -> str:
     """Send one request. Never expose the provider key to the browser."""
     from app.config import settings
@@ -20,6 +24,7 @@ async def ask_llm(system: str, messages: list[dict]) -> str:
         raise AIServiceError("LLM_API_KEY is not configured")
 
     model = settings.LLM_MODEL.strip() or "gpt-5-mini"
+    base_url = getattr(settings, "LLM_BASE_URL", "https://copa.codyssey.kr/v1").rstrip("/")
     try:
         timeout = float(settings.LLM_TIMEOUT_SECONDS)
         if timeout <= 0:
@@ -35,7 +40,7 @@ async def ask_llm(system: str, messages: list[dict]) -> str:
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                "https://copa.codyssey.kr/v1/chat/completions",
+                f"{base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
                 json=payload,
             )

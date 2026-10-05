@@ -41,7 +41,7 @@ class Credentials(BaseModel):
 
 
 class ChatInput(BaseModel):
-    mode: Literal["q1", "q2", "q3", "q4", "q5"]
+    mode: Literal["q1", "q2", "q3", "q4", "q5", "q6", "free"]
     message: str = Field(min_length=1, max_length=500)
 
     @field_validator("message")
@@ -74,7 +74,11 @@ def demo_answer(mode: str, message: str) -> str:
                 "내용: 이전 영상의 핵심 → 연결된 변화 한 가지 → 시청자가 확인할 지표.\n"
                 "오늘의 실제 핫이슈를 반영한 추천은 아닙니다."
             )
-    return ANSWERS[mode]
+    # 실제 화면은 C의 모드 번호를 사용한다. 기존 데모 API의 q2/q3도 유지한다.
+    current_mode_answers = {"q4": "q3", "q5": "q4", "q6": "q5"}
+    if mode == "free":
+        return "[예시 응답 · 실시간 데이터 미연결]\n\n경제 숏폼 기획에 관한 자유 질문입니다. 실제 서비스에서는 AI가 답변합니다."
+    return ANSWERS[current_mode_answers.get(mode, mode)]
 
 
 def create_demo_app() -> FastAPI:

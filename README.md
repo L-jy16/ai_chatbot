@@ -1,305 +1,159 @@
 # PULSE · 경제 숏폼 트렌드 챗봇
 
-유튜브 경제·AI 숏폼 제작자가 오늘의 주제, 게시 타이밍, 새로운 관점, 후속 시리즈를 질문하는 FastAPI 서비스입니다. 최근·과거 트렌드 데이터를 서버의 LLM 프롬프트에 넣는 구조를 목표로 합니다.
+경제·AI 숏폼 제작자를 위한 FastAPI 챗봇입니다. 회원가입·로그인 후 네이버 뉴스·검색 추이를 참고하여 AI와 기획하고, 사용자별 대화 기록을 확인합니다.
 
-**현재 상태:** D 화면을 A의 실제 회원가입·로그인·로그아웃 API와 users DB에 연결했습니다. `app.main:app`에서 실제 계정을 만들고 로그인 후 채팅·기록 화면에 접근할 수 있습니다. 페이지 접근은 A의 DB 사용자 조회로 검사합니다. B의 데이터와 C의 Chat·AI 코드는 아직 develop에 없어 채팅·기록 기능은 503과 준비 중 안내를 반환합니다. 별도 데모에서는 예시 채팅을 확인할 수 있습니다. **배포는 사용자 요청으로 제외했습니다.**
+## 현재 통합 상태
 
-## D 구현 범위
+A의 인증·SQLite, B의 트렌드, C의 채팅·AI, D의 PULSE UI를 연결했습니다. 실제 앱은 `app.main:app`이며 C의 다섯 모드가 채팅·대화 저장 경로를 사용합니다. `dev.demo_app:app`은 외부 API를 호출하지 않는 별도의 고정 응답 데모입니다.
 
-| 항목 | 파일 / 동작 |
+| 모드 | 기능 |
 | --- | --- |
-| 공통 템플릿·반응형 스타일 | `app/templates/base.html`, `app/static/css/style.css` |
-| 로그인·회원가입 | `login.html`, `signup.html`, `static/js/auth.js` |
-| 채팅·같은 화면 응답 | `chat.html`, `static/js/chat.js` |
-| Q1~Q5·예시 질문 | `static/js/modes.js` |
-| 대기·오류·입력 검증 | 빈 값·500자 제한, 중복 전송 차단, 실패 시 입력 유지·재로그인 안내 |
-| 내 기록 API | `app/routers/logs.py`, 인증 사용자별 최신순 조회 |
-| 내 기록 화면 | `history.html`, `static/js/history.js` |
-| DB 확인 SQL·스크립트 | `scripts/check_logs.sql`, `scripts/check_logs.py` |
-| 팀 코드 연결 | `app/ui.py`의 `install_ui()` |
-| 문서 | 이 README, `docs/D_HANDOFF.md`, `docs/D_PR_DRAFTS.md` |
+| Q1 | 오늘의 주제: 최신 경제 뉴스와 최근/이전 검색 추이, 추천 주제·내용 |
+| Q4 | 타이밍 체크: B의 검색 관심도·뉴스를 비교해 지금/기다리기/다른 각도 제안 |
+| Q5 | 새로운 각도: 반전·비교·논쟁·정보·경험형의 5~10개 아이디어와 최종 추천 |
+| Q6 | 다음 편 기획: 이전 주제에서 이어지는 1→2→3편 구조와 오늘의 다음 편 |
+| free | 경제 숏폼 관련 자유 질문. 최신 자료가 없으면 그 한계를 안내 |
 
-## 로컬 미리보기 실행
+뉴스는 최신순 일부 검색 결과이며 인기 순위나 전체 언급량이 아닙니다. 데이터가 없거나 조회에 실패하면 실시간 사실을 지어내지 않고 한계를 알리도록 프롬프트에 명시합니다. 실제 답변 품질과 키 권한은 별도 실서비스 확인이 필요합니다. 배포·외부 접속 설정은 포함하지 않습니다.
 
-Python 3.10 이상. 기존 가상환경이 있으면 재사용하세요.
+## 실행
 
-Windows PowerShell:
+Python 3.10 이상. 기존 가상환경과 `.env`가 있으면 그대로 사용하며, 예제 파일로 덮어쓰지 마세요.
 
-```powershell
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-ui-dev.txt
-./.venv/Scripts/python.exe -m uvicorn dev.demo_app:app --host 127.0.0.1 --port 8000
-```
-
-Linux/macOS:
+macOS/Linux:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt -r requirements-ui-dev.txt
-.venv/bin/python -m uvicorn dev.demo_app:app --host 127.0.0.1 --port 8000
+.venv/bin/python -m pip install -r requirements.txt
+# .env가 없을 때만 실행
+cp -n .env.example .env
+.venv/bin/python -c "import secrets; print(secrets.token_hex(32))"
+# 생성한 값을 .env의 SECRET_KEY에 넣고 나머지 API 설정을 채운 뒤 실행
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-접속: `http://127.0.0.1:8000/login`
+Windows PowerShell에서는 `.venv/bin/python` 대신 `./.venv/Scripts/python.exe`를 사용합니다. `.env`가 없을 때만 `Copy-Item .env.example .env`로 복사합니다.
 
-| 공개 테스트 계정 | 값 |
+1. `http://127.0.0.1:8000/signup`에서 회원가입합니다.
+2. `/login`에서 로그인합니다.
+3. `/`에서 Q1·Q4·Q5·Q6·자유 질문 중 하나를 선택해 질문합니다. Q6에는 이전 업로드 주제를 함께 입력할 수 있습니다.
+4. `/history`에서 사용자별 성공·실패 기록을 확인합니다.
+
+상태 확인: `/health`. API 문서: `/docs`. `.env`를 바꾸면 서버를 재시작합니다. 서버는 기본 `app.db`에 users·chats 테이블을 생성합니다.
+
+## 환경 변수와 API 연결
+
+| 변수 | 설명 / 기본값 |
 | --- | --- |
-| 이메일 | `demo@example.com` |
-| 비밀번호 | `demo-pass-2026` |
+| `SECRET_KEY` | 필수 세션 서명 키, 16자 이상 |
+| `DATABASE_URL` | `sqlite:///./app.db` |
+| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 뉴스·데이터랩용 인증 쌍 |
+| `NAVER_TIMEOUT_SECONDS` | 네이버 개별 요청 제한, 기본 5초 |
+| `LLM_API_KEY` | Codyssey에서 발급한 AI 키 |
+| `LLM_BASE_URL` | `https://copa.codyssey.kr/v1` |
+| `LLM_MODEL` | `.env.example`은 `gpt-5-mini`, 사용 계정의 허용 모델 지정 |
+| `LLM_TIMEOUT_SECONDS` | AI 호출 전체 제한, 기본 30초 |
 
-이 계정은 실제 계정·비밀키가 아닙니다. 데모는 고정 예시 응답, 메모리 SQLite, 예시 로그인만 제공합니다. 회원가입 화면은 있지만 데모 가입 API는 503과 미연결 안내를 반환합니다. DB는 재시작하면 초기화되며 쿠키명은 `pulse_demo_session`입니다. 상단 배너에서 뉴스·AI 미연결 상태를 확인할 수 있습니다. `dev/demo_app.py`를 운영 앱으로 사용하지 마세요.
+사진의 Claude Code 설정 파일을 이 앱에서 읽지는 않습니다. 프로젝트 `.env`를 사용합니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
 
-확인 순서:
+키는 서버에서만 사용합니다. `.env`·가상환경·DB는 Git에서 제외됩니다. 브라우저는 같은 출처의 `/api/*`만 호출합니다. D 페이지는 CSP와 `textContent`로 질문·답변의 HTML 실행을 방지합니다.
 
-1. 회원가입 화면의 이메일·비밀번호 확인을 살펴봅니다. 실제 가입은 A 연결 후 검사합니다.
-2. 예시 계정으로 로그인하고 다섯 가지 모드를 선택해 질문합니다. Q2에서는 과거 업로드 주제를 먼저 입력합니다.
-3. 같은 화면에서 응답을 확인합니다.
-4. `[timeout]`, `[error]`를 질문으로 정확히 입력해 실패 안내·입력 유지·재시도를 확인합니다. 데모 전용 테스트 문자열입니다.
-5. 내 기록에서 질문·응답·시각·성공/실패 상태를 확인합니다.
-6. 로그아웃 후 `/`, `/history`, `/api/me/chats` 접근 차단을 확인합니다.
-
-## 실제 프로젝트 기반·인증 실행
-
-`origin/develop`의 A 앱은 `requirements.txt`의 고정 버전을 사용합니다. 위 의존성 설치 후 `.env.example`을 `.env`로 복사하고, 무작위 서명 키를 생성해 `.env`의 `SECRET_KEY`에 입력합니다.
-
-```powershell
-Copy-Item .env.example .env
-./.venv/Scripts/python.exe -c "import secrets; print(secrets.token_hex(32))"
-# 출력값을 .env의 SECRET_KEY에 입력한 뒤 실행
-./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
-```
-
-Linux/macOS에서는 `cp .env.example .env`, `.venv/bin/python`을 사용합니다. `SECRET_KEY`는 필수이며 16자 이상이어야 합니다. 첫 실행 시 기본 `app.db`와 users 테이블을 생성합니다.
-
-- 상태 확인: `GET http://127.0.0.1:8000/health` → `{"status":"ok"}`.
-- API 문서: `http://127.0.0.1:8000/docs`.
-- 실제 인증: 가입 201, 로그인 200과 세션 쿠키, 로그아웃 204(응답 본문 없음).
-- 실제 가입 화면: `http://127.0.0.1:8000/signup`. 로그인 후 D 화면으로 이동하며 실제 A 세션을 사용합니다. Chat 모델 미연결 상태에서는 채팅 전송을 비활성화하고 기록에 준비 중 안내를 표시합니다.
-
-## 구조와 담당
-
-```text
-브라우저: Jinja2 + CSS + 순수 JS [D]
-  ├─ /api/auth/* → 세션 인증 [A]
-  ├─ /api/chat → 시나리오·트렌드 [B/C] → 서버 LLM [C] → chats 저장 [C]
-  └─ /api/me/chats → 인증 [A] → 사용자별 chats 조회 [D]
-                                   └─ SQLite 연결 [A]
-```
+## 구조와 연결
 
 ```text
 app/
-├── main.py, config.py, database.py     # A: origin/develop에서 통합
-├── dependencies.py, errors.py         # A: 인증 의존성·공통 오류
-├── security.py, models/user.py        # A: bcrypt·User
-├── models/chat.py                     # C: 통합 시 추가
-├── routers/
-│   ├── auth.py                        # A: 실제 인증 API
-│   ├── chat.py                        # C: 통합 시 추가
-│   ├── pages.py                       # D
-│   └── logs.py                        # D
-├── services/                          # B/C: 통합 시 추가
-├── ui.py                              # D: 등록 도우미
-├── templates/                         # D: 5개 템플릿
-└── static/css/, static/js/             # D
-dev/demo_app.py                        # 실제 앱과 분리한 데모
-dev/check_ui_browser.py                # 선택적 브라우저 검사
-scripts/check_logs.sql, check_logs.py   # D: 읽기 전용 검사
-tests/test_ui.py                       # D: API·SQL 검사
+├── main.py, config.py, database.py       # 기반·설정·DB
+├── dependencies.py, errors.py, security.py
+├── models/user.py, chat.py              # 사용자·대화
+├── routers/auth.py, chat.py             # 인증·AI 요청
+├── routers/pages.py, logs.py            # D 페이지·기록 조회
+├── services/trend.py, llm.py            # 네이버·AI
+├── services/scenarios/q1.py, q3.py, q5.py, q6.py  # 사용 중인 시나리오 프롬프트
+├── ui.py                               # 페이지·static·기록 라우터 등록
+├── templates/                          # D Jinja2 템플릿
+└── static/css/, static/js/              # D UI
 ```
 
-## A·C 코드에 연결
+`main.py`는 A 인증 라우터와 C의 `create_router(require_login, get_db)`를 등록하고 `install_ui(..., chat_model=Chat)`를 한 번 호출합니다. `/static`, `/`, `/api/me/chats`는 D 등록만 사용하여 중복 경로를 피합니다.
 
-`main.py`에서 `install_ui()`를 호출해 실제 인증과 D 페이지를 이미 등록했습니다. `get_current_user`를 전달해 페이지에서도 삭제된 사용자를 확인합니다. C의 `Chat` 모델과 채팅 라우터가 준비되면 기존 등록 호출을 다음처럼 변경합니다. 호출을 추가하지 않습니다.
+사용자별 최근 **성공 대화 5개**를 AI에 전달합니다. 외부 동기 HTTP 호출은 스레드로 분리하며 전체 트렌드 준비 시간도 제한합니다. 요청 수신, AI 시작·성공/실패, DB 저장 성공/실패를 기록합니다. 질문·키·AI 서비스의 원본 오류 본문은 로그에 넣지 않습니다.
 
-```python
-# A의 실제 의존성과 C가 구현할 Chat을 사용합니다.
-from app.database import get_db
-from app.dependencies import get_current_user, require_login
-from app.models.chat import Chat
-from app.ui import install_ui
+## API
 
-# 기존 install_ui 호출을 교체하고 C의 /api/chat 라우터도 등록
-install_ui(app, require_login=require_login, get_db=get_db,
-           get_current_user=get_current_user, chat_model=Chat)
-```
-
-`install_ui()`는 `/static`과 페이지를 등록합니다. Chat을 전달하면 실제 로그 API를 등록하고, 생략하면 인증 후 503을 반환하는 채팅·기록 준비 중 경로를 등록합니다. 중복 호출은 오류로 알립니다. C 연결 시 앱을 새로 시작해 준비 중 경로를 실제 라우터로 바꿉니다. 실제 앱 실행 대상은 `app.main:app`입니다.
-
-팀과 합의할 추가 계약:
-
-- 최신 mode는 q1~q5입니다. Q2에서는 최근 업로드 주제를 먼저 입력받아 `최근 업로드 주제: ...\n질문: ...` 형태의 message로 전달하며 전체 500자 제한을 검사합니다. 기존 q4/q5/q6 의미와 달라 C의 검증·분기도 함께 맞춰야 합니다. 기존 번호로 저장된 기록은 팀이 변환 범위를 확인합니다.
-
-- A는 로그인 시 `request.session["user_id"]`에 정수 ID를 저장하고 로그아웃 시 세션을 지웁니다.
-- `app.dependencies.require_login`은 비로그인을 401로 차단하고 실제 `User`를 반환합니다. 삭제된 사용자 세션은 `get_current_user`가 비웁니다. D 로그 라우터는 이 User의 ID를 사용합니다.
-- `get_db()`는 **동기 SQLAlchemy Session**을 yield하고 닫습니다. AsyncSession은 현재 로그 라우터와 호환되지 않습니다.
-- C의 `Chat`은 `id`, `user_id`, `mode`, `question`, nullable `answer`, `status`, `created_at` 속성을 갖습니다.
-- 실제 인증 요청은 JSON `{email, password}`입니다. 로그인은 200 및 세션 쿠키, 가입은 201 후 로그인 화면으로 이동하고 로그아웃은 204입니다.
-- 가입 화면과 A의 서버는 비밀번호 8자 이상·UTF-8 72바이트 이하를 검증합니다. 화면에서도 한글 등 멀티바이트 입력을 검사합니다. 서버 검증은 별도로 유지합니다.
-- C의 AI timeout은 브라우저 제한 65초보다 짧게 설정합니다. 브라우저 연결이 끊겨도 서버가 저장할 수 있어 시간 초과 안내는 내 기록 확인을 요청합니다.
-- API 오류는 `{error, message}`를 우선 사용합니다. 문자열 `detail`과 FastAPI 검증 오류 배열도 표시합니다.
-
-## API 명세
-
-인증·페이지는 A와 D가 실제 연결되어 있습니다. Chat·채팅은 C의 **팀 계약**으로 대기 상태입니다. 실제 앱의 `/api/chat`과 `/api/me/chats`는 로그인 전 401, 로그인 후 준비 중 503입니다. C 모델 연결 후 D의 실제 로그 조회를 등록합니다. 데모와 구분합니다.
-
-| 메서드 | 경로 | 인증 | 설명 / 담당 |
-| --- | --- | --- | --- |
-| POST | `/api/auth/signup` | X | A 실제 가입 201, 화면 D / 데모는 503 |
-| POST | `/api/auth/login` | X | A 실제 로그인 200 / 데모 예시 로그인 |
-| POST | `/api/auth/logout` | O | A 실제 로그아웃 204, 버튼 D |
-| POST | `/api/chat` | O | AI 호출·저장 C / 데모 고정 응답 |
-| GET | `/api/me/chats?limit=20` | O | 내 기록 JSON D |
-| GET | `/`, `/history` | O | 페이지 D, 비로그인 303 `/login` |
-| GET | `/login`, `/signup` | X | 페이지 D, 로그인 시 303 `/` |
-
-채팅 요청과 성공 응답:
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| POST | `/api/auth/signup` | 회원가입, 201 |
+| POST | `/api/auth/login` | 로그인·세션 쿠키, 200 |
+| POST | `/api/auth/logout` | 로그인 필요, 204 |
+| GET | `/api/me` | 내 사용자 정보·설정 여부, 키 값 제외 |
+| POST | `/api/chat` | 로그인 필요, q1/q4/q5/q6/free 질문·AI 응답·저장 |
+| GET | `/api/me/chats?limit=20` | 내 기록만 최신순, 1~100개, no-store |
 
 ```json
-{"mode": "q3", "message": "금리 인하 주제 지금 올려도 돼?"}
+{"mode":"q4","message":"금리 인하 주제 지금 올려도 돼?","keyword":"금리 인하"}
 ```
 
-```json
-{"chat_id": 987, "answer": "트렌드 데이터와 함께 생성한 AI 응답"}
-```
+`keyword`는 Q4 타이밍 분석에서 선택적으로 지정할 수 있습니다. UI는 질문에서 키워드를 추출하는 기본 경로를 사용합니다. Q6 UI는 이전 업로드 주제를 입력하면 `최근 업로드 주제: ...\n질문: ...`를 한 message로 전송하며 전체 500자 제한을 적용합니다. 주제가 없으면 먼저 기존 주제를 물어보도록 프롬프트에 지시합니다.
 
-오류 응답 계약:
+성공: `{"chat_id":1,"answer":"..."}`. 비로그인 401, 입력 오류 422, AI 실패 502, 시간 초과 504, 저장 오류 500입니다. 기록 조회 DB 실패는 D 라우터에서 503으로 처리합니다. 시간 초과·AI 오류도 answer=null로 저장합니다.
 
-```json
-{"error": "AI_TIMEOUT", "message": "현재 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요."}
-```
+## 시나리오 번호와 기존 기록
 
-타임아웃 504, AI 실패 502(팀 합의 필요), 입력 오류 422, 인증 실패 401을 처리합니다.
+현재 계약은 [docs/SCENARIOS.md](docs/SCENARIOS.md)의 q1/q4/q5/q6/free입니다. Q4는 타이밍, Q5는 새로운 각도, Q6는 다음 편입니다.
 
-내 기록 응답:
+`chats.scenario_version`으로 기록의 번호 체계를 구분합니다. 서버 시작 시 기존 chats 테이블에 해당 열이 없으면 기본 1로 추가하며, 원래 mode·질문·답변은 그대로 보존합니다. 새 C 기록은 버전 3입니다. B의 Q1~Q5 번호로 저장된 버전 2 기록은 조회할 때 q3→q4, q4→q5, q5→q6로 표시합니다. API 응답 필드 수는 기존 계약과 같습니다. 스키마 변경은 반복 실행해도 열을 중복 추가하지 않습니다.
 
-```json
-[
-  {
-    "id": 987,
-    "mode": "q3",
-    "question": "금리 인하 주제 지금 올려도 돼?",
-    "answer": "트렌드 데이터와 함께 생성한 AI 응답",
-    "status": "success",
-    "created_at": "2026-10-05T15:50:00"
-  }
-]
-```
+users와 chats는 user_id로 연결됩니다. DB 생성 시각은 UTC이며 D 화면은 offset 없는 시각을 `(서버 시각)`으로 표시합니다.
 
-`limit` 기본 20, 허용 1~100. `created_at DESC, id DESC` 정렬. 조회 범위는 인증 사용자로 고정됩니다. 빈 기록은 `[]`, 실패 응답은 `null`일 수 있습니다. DB 조회 실패는 503입니다. `Cache-Control: no-store`로 응답 캐시를 막습니다.
+## 트렌드 판정의 한계
 
-시각에 UTC offset이 있으면 화면에서 KST로 변환합니다. offset 없는 시각은 시간대를 추정하지 않고 `(서버 시각)`으로 표시합니다. 실제 UTC/KST 기준은 A·C가 합의합니다.
+한국 시간 어제까지 완료된 14일을 한 번에 조회하여 같은 척도로 비교합니다. 최근 7일 평균이 이전 7일보다 20% 이상 높으면 rising, 20% 이상 낮으면 falling입니다. 그 사이에서 상대지수가 80 이상이면 peak(정점 후보), 나머지는 stable(보합)입니다. 실제 정점을 확정하는 통계 모델은 아닙니다.
 
-## DB 구조·확인 가이드
+빈 응답·14일 데이터 누락·전 기간 0은 unknown, available=false, 평균 null입니다. 검색 상대지수는 조회수나 실제 검색 횟수가 아닙니다.
 
-7-1의 **목표 스키마**입니다. User와 users 테이블 생성은 A에 구현되어 있고 Chat은 C 통합을 기다립니다. 데모는 별도의 `chats` 테스트 테이블만 메모리에 생성합니다.
-
-```mermaid
-erDiagram
-    users ||--o{ chats : "user_id"
-    users {
-        INTEGER id PK
-        TEXT email UK
-        TEXT password_hash
-        DATETIME created_at
-    }
-    chats {
-        INTEGER id PK
-        INTEGER user_id FK
-        TEXT mode
-        TEXT question
-        TEXT answer "nullable on failure"
-        TEXT status
-        DATETIME created_at
-    }
-```
-
-`mode`: q1/q2/q3/q4/q5/free. `status`: success/timeout/error. 사용자의 최신 정의에 따라 Q2는 운영 채널 전용 독립 모드입니다. 처리 순서와 번호 변경 계약은 [시나리오 문서](docs/SCENARIOS.md)에 있습니다.
-
-API 확인(Linux/macOS shell 예시):
+## 검증과 데모
 
 ```bash
-curl -c /tmp/pulse-cookie.txt -H 'Content-Type: application/json' \
-  -d '{"email":"demo@example.com","password":"demo-pass-2026"}' \
-  http://127.0.0.1:8000/api/auth/login
-curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
+.venv/bin/python -m pytest -q
+.venv/bin/python -m pip check
 ```
 
-영구 SQLite 파일 확인:
+테스트는 임시 DB와 모의 외부 응답을 사용하며 실제 유료 API를 호출하지 않습니다. 기존 인증·UI 테스트에 다섯 모드 분기·프롬프트·대화 저장·사용자 격리·오류·구 기록 호환 검사를 포함합니다.
 
-```powershell
-./.venv/Scripts/python.exe scripts/check_logs.py --db chatbot.db --user-id 1 --limit 20
+실제 연결 확인은 아래 명령으로 별도 수행할 수 있습니다. **실제 API 사용량이 발생할 수 있습니다.** 임시 DB에서 가입→로그인→Q4 실제 AI 호출→기록을 확인하며 운영 app.db는 수정하지 않습니다.
+
+```bash
+.venv/bin/python -m scripts.check_connection
 ```
 
-`chatbot.db`를 A의 실제 DB 경로로 바꾸세요. 스크립트는 `mode=ro`로 읽기만 하고 없는 DB를 새로 만들지 않습니다. `--user-id`는 필수이며 SQL에 바인딩됩니다. DB 접근 권한이 있는 개발자용 도구로, 사용자 인증 API를 대체하지 않습니다. 메모리 데모에는 영구 DB 파일이 없습니다. SQLite CLI 명령은 SQL 파일 주석에 있습니다.
+UI 전용 데모:
 
-## 환경 변수·민감정보
-
-브라우저는 같은 출처의 `/api/*`만 요청하고 AI·네이버 키를 읽지 않습니다. 설정 이름은 `origin/develop`의 `app/config.py`를 기준으로 합니다.
-
-| 이름 | 담당 / 용도 |
-| --- | --- |
-| `SECRET_KEY` | A / 필수 세션 서명 키, 16자 이상 |
-| `DATABASE_URL` | A / 기본 `sqlite:///./app.db` |
-| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | B / 네이버 인증 |
-| `LLM_API_KEY`, `LLM_MODEL` | C / API 키·모델, 기본 빈 값 |
-| `LLM_TIMEOUT_SECONDS` | C / 서버 AI 호출 제한, 기본 30초 |
-
-`.env.example`에는 비밀값 없이 이름과 안전한 기본값만 있습니다. `.env`로 복사해 `SECRET_KEY` 등 로컬 값을 채우면 A의 config에서 로드합니다. **D 데모는 `.env`를 읽지 않으며** API 키 없이 실행됩니다. `.gitignore`에서 `.env`와 파생 환경 파일, 가상환경, DB, 임시 캡처, OS·IDE 파일을 제외합니다.
-
-페이지 CSP는 같은 출처의 스크립트·스타일·연결만 허용합니다. 질문·AI 응답·기록은 `textContent`로 표시해 HTML 실행을 방지합니다.
-
-## 검증
-
-```powershell
-./.venv/Scripts/python.exe -m pytest -q --basetemp tmp/test-runs/local
+```bash
+.venv/bin/python -m pip install -r requirements-ui-dev.txt
+.venv/bin/python -m uvicorn dev.demo_app:app --host 127.0.0.1 --port 8001
 ```
 
-D의 **40개 테스트**는 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 다섯 모드 저장·조회, Q2 업로드 맥락·추가 질문, timeout/error 후 재시도, SQL 읽기 전용을 검증합니다. `pytest`는 원격 A의 인증·설정·DB·보안 테스트도 함께 실행합니다. 테스트는 임시 SQLite를 사용하며 실제 `app.db`를 수정하지 않습니다. `tests/conftest.py`에서 외부 API 키를 비워 유료 호출을 방지합니다. A의 `httpx2` 의존성도 유지합니다.
+데모 계정은 `demo@example.com` / `demo-pass-2026`입니다. 실제 계정이 아니며 예시 응답과 메모리 DB만 제공합니다. 데모 가입은 503, `[timeout]`·`[error]`는 데모 전용 실패 시뮬레이션입니다. 실제 앱 대신 데모를 운영하지 마세요.
 
-A/D 실제 인증 연결 테스트 6개를 추가하여 **전체 125개 테스트 통과**. 실제 가입→DB 저장→로그인→페이지 접근→204 로그아웃, 삭제된 계정 차단, 미연결 API의 401/503을 확인했습니다.
+브라우저 검사 도구: `requirements-ui-browser.txt`, `dev/check_ui_browser.py`, `dev/check_auth_browser.py`. 실행법과 D 작업 이력은 [D_HANDOFF.md](docs/D_HANDOFF.md)에 있습니다. 해당 문서의 통합 전 준비 중 상태는 이 README의 현재 상태와 구분합니다.
 
-브라우저 검사(선택 사항, 별도 터미널에서 데모 실행):
+DB 읽기 전용 검사:
 
-```powershell
-./.venv/Scripts/python.exe -m pip install -r requirements-ui-browser.txt
-# 설치된 Chrome을 별도 테스트 프로필로 사용
-./.venv/Scripts/python.exe dev/check_ui_browser.py --channel chrome
-# Chrome이 없으면 Chromium 설치 후 channel 없이 실행
-./.venv/Scripts/python.exe -m playwright install chromium
-./.venv/Scripts/python.exe dev/check_ui_browser.py
+```bash
+.venv/bin/python scripts/check_logs.py --db app.db --user-id 1 --limit 20
 ```
 
-데모 검사는 다섯 모드 payload·Q2 업로드 주제와 총 길이 제한·timeout 입력 유지·응답 HTML 비실행·기록 빈/오류 상태·375px 모바일을 확인합니다. 캡처는 `output/ui/`에 생성됩니다.
+SQLite CLI 예시는 `scripts/check_logs.sql`을 참고하세요. 존재하지 않는 DB는 새로 만들지 않습니다.
 
-실제 인증 브라우저 검사는 **테스트용 DB로 실행한 실제 A 앱**에 대해 다음처럼 수행합니다. 검사 과정에서 테스트 계정이 만들어지므로 운영 DB가 아닌 별도 SQLite를 사용합니다.
+## 역할과 협업
 
-```powershell
-./.venv/Scripts/python.exe dev/check_auth_browser.py --channel chrome --base-url http://127.0.0.1:8001
-```
-
-실제 회원가입·72바이트 검사·틀린 로그인·성공 로그인·D 페이지·204 로그아웃·모바일 검증을 Windows headless Chrome으로 통과했습니다. 네이버·LLM·실제 chats 저장은 C 연결 후 검증해야 합니다.
-
-## 팀 역할·개인별 작업 요약
-
-이름은 팀에서 확정합니다. A 코드는 `origin/develop`에서 통합했고 D 작업을 현재 브랜치에 추가했습니다.
-
-| 역할 | 브랜치 | 계획 / 현재 상태 |
+| 역할 | 브랜치 | 담당 |
 | --- | --- | --- |
-| A | feature/auth | 기반, config, DB, User, 회원가입·세션 / origin/develop에서 통합 |
-| B | feature/trend | 네이버, 추이 비교, Q1·Q3 데이터 / 코드 대기, Q2 연계는 팀 합의 |
-| C | feature/chat | Chat, LLM, 컨텍스트, mode, 저장, Q4·Q5 / 코드 대기, Q2 대화 흐름 추가 필요 |
-| D | feature/ui | 4개 화면·공통 스타일, A 실제 인증 연결, 다섯 모드·Q2 맥락·오류·대기, 기록 라우터·SQL, 데모·검증·문서 완료. C 기록 연결 대기. 배포 제외 |
+| A | feature/auth | 프로젝트 기반, User·세션 인증, 보안·검증 |
+| B | feature/trend | 뉴스·검색 추이, 시나리오 데이터 |
+| C | feature/chat | Chat·LLM·컨텍스트·분기·저장 |
+| D | feature/ui | PULSE 화면·기록 조회·SQL·데모·문서 |
 
-D의 변경은 `feature/ui`에 기능별 커밋으로 기록했습니다. `git log --oneline feature/ui`로 확인합니다. 팀 협업 계획은 `feature/* → develop → main`, PR 기반 merge commit, 팀원 1명 이상 승인입니다. [D PR #4](https://github.com/L-jy16/ai_chatbot/pull/4)는 develop 대상이며 최신 origin/develop을 feature/ui에 합쳐 공통 설정·문서 충돌을 해결했습니다. develop PR의 최종 승인은 팀 리뷰로 진행합니다. A의 세부 설계는 [auth-design.md](docs/auth-design.md), D 전달서는 [D_HANDOFF.md](docs/D_HANDOFF.md)를 참고하세요.
+이번 feature/trend 통합에서는 A·B 연결에 필요했던 C 영역의 기본 구현을 최신 다섯 모드로 확장하고 D UI를 연결했습니다. 이후 C 브랜치와 합칠 때 Chat·LLM·채팅 라우터의 중복 구현을 확인하세요.
 
-## 통합 후 남은 검증
-
-- 실제 회원가입·중복 가입·로그인·세션 종료 및 서버 입력 검증.
-- 네이버 추이와 실제 AI로 다섯 시나리오 응답·최근 N개 대화 컨텍스트 확인.
-- 성공·실패 로그를 실제 SQLite, API, 화면, SQL에서 사용자별로 대조.
-- 요청 수신 / AI 호출 / 응답·실패 / DB 저장 성공·실패 서버 로그 확인.
-- 환경 변수 이름·비밀번호 정책·timestamp 기준 합의.
-- PR 게시·리뷰·merge 및 팀원별 커밋·작업 요약 대조.
-
-배포·외부 URL 검증은 요청에서 제외했으므로 완료로 표시하지 않습니다. 평가 전에는 팀에서 별도로 진행해야 합니다.
-
-참고: [FastAPI 템플릿](https://fastapi.tiangolo.com/advanced/templates/), [SQLAlchemy ORM 조회](https://docs.sqlalchemy.org/en/20/orm/queryguide/select.html). 과제 기준은 사용자가 제공한 `PDF/`의 7-1 개발 계획과 AI 도구 학습 미션입니다.
+팀 정책은 feature/* → develop → main, PR 리뷰 후 merge commit입니다. 배포와 실제 API 데이터·응답 품질 검증은 별도이며, 로컬 테스트 성공만으로 완료 표시하지 않습니다.

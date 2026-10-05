@@ -8,6 +8,7 @@ const loading = document.querySelector('#history-loading');
 const empty = document.querySelector('#history-empty');
 const count = document.querySelector('#history-count');
 const statuses = {success: '응답 완료', timeout: '응답 시간 초과', error: '응답 실패'};
+const legacyModeTitles = {q2: '운영 채널 추천 (이전)', q3: '타이밍 체크 (이전)'};
 
 function textNode(tag, className, text) {
   const node = document.createElement(tag);
@@ -30,7 +31,7 @@ function renderRecord(record) {
   const time = textNode('time', 'tiny muted', displayTime(record.created_at));
   time.dateTime = record.created_at;
   const status = ['success', 'timeout', 'error'].includes(record.status) ? record.status : 'unknown';
-  meta.append(textNode('span', 'mode-tag', MODES[record.mode]?.title || '자유 질문'), time, textNode('span', `status-tag status-${status}`, statuses[record.status] || '상태 확인 필요'));
+  meta.append(textNode('span', 'mode-tag', MODES[record.mode]?.title || legacyModeTitles[record.mode] || '모드 확인 필요'), time, textNode('span', `status-tag status-${status}`, statuses[record.status] || '상태 확인 필요'));
   article.append(meta, textNode('h3', 'history-question', record.question));
   const details = document.createElement('details');
   details.open = record.status !== 'success';

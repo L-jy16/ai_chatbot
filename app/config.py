@@ -15,11 +15,13 @@ class Settings(BaseSettings):
     # B: 네이버 API
     NAVER_CLIENT_ID: str = ""
     NAVER_CLIENT_SECRET: str = ""
+    NAVER_TIMEOUT_SECONDS: float = Field(default=5, gt=0)
 
     # C: LLM API
     LLM_API_KEY: str = ""
     LLM_MODEL: str = ""
-    LLM_TIMEOUT_SECONDS: float = 30
+    LLM_BASE_URL: str = "https://copa.codyssey.kr/v1"
+    LLM_TIMEOUT_SECONDS: float = Field(default=30, gt=0)
 
 
 settings = Settings()

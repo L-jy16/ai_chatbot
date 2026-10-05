@@ -12,6 +12,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.config import settings
+
 
 ALLOWED_MODES = {"q1", "q4", "q5", "q6", "free"}
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ def build_messages(recent_first: Sequence[CompletedChat], question: str) -> list
 class ChatRequest(BaseModel):
     mode: str
     message: str
+    keyword: str | None = None
 
     @field_validator("mode", "message", mode="before")
     @classmethod
@@ -61,6 +64,24 @@ class ChatRequest(BaseModel):
     def require_valid_question(cls, value: str) -> str:
         if not 1 <= len(value) <= 500:
             raise ValueError("질문은 1~500자로 입력해 주세요.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("질문에 사용할 수 없는 문자가 있어요.") from None
+        return value
+
+    @field_validator("keyword")
+    @classmethod
+    def require_valid_keyword(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        if len(value) > 50:
+            raise ValueError("분석 키워드는 50자 이하로 입력해 주세요.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("키워드에 사용할 수 없는 문자가 있어요.") from None
         return value
 
 
@@ -93,9 +114,9 @@ def create_router(require_login, get_db) -> APIRouter:
 
             system = await q1.build_prompt(body.message)
         elif body.mode == "q4":
-            from app.services.scenarios import q4
+            from app.services.scenarios import q3
 
-            system = await q4.build_prompt(body.message)
+            system = await q3.build_prompt(body.message, body.keyword)
         else:
             system = (
                 "당신은 경제·AI 숏폼 제작자의 도우미입니다. 한국어로 간결하게 답하세요. "
@@ -141,5 +162,14 @@ def create_router(require_login, get_db) -> APIRouter:
                 content={"error": "AI_ERROR", "message": "AI 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요."},
             )
         return {"chat_id": chat_id, "answer": answer}
+
+    @router.get("/api/me")
+    def me(user=Depends(require_login)):
+        return {
+            "id": user.id,
+            "email": user.email,
+            "trend_configured": bool(settings.NAVER_CLIENT_ID and settings.NAVER_CLIENT_SECRET),
+            "llm_configured": bool(settings.LLM_API_KEY),
+        }
 
     return router

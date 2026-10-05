@@ -96,6 +96,27 @@ def test_chat_saves_answer_for_authenticated_user(chat_app):
         assert row.created_at is not None
 
 
+def test_b_trend_prompts_use_c_mode_numbers(chat_app, monkeypatch):
+    from app.services.scenarios import q1, q3
+
+    async def today_prompt(message):
+        return "Q1 트렌드 근거"
+
+    async def timing_prompt(message, keyword=None):
+        assert keyword == "금리 인하"
+        return "Q4 타이밍 근거"
+
+    monkeypatch.setattr(q1, "build_prompt", today_prompt)
+    monkeypatch.setattr(q3, "build_prompt", timing_prompt)
+    client, _, _, calls = chat_app
+    headers = {"X-Test-User": "1"}
+    assert client.post("/api/chat", json={"mode": "q1", "message": "오늘 주제"}, headers=headers).status_code == 200
+    assert client.post(
+        "/api/chat", json={"mode": "q4", "message": "지금 올려도 돼?", "keyword": "금리 인하"}, headers=headers
+    ).status_code == 200
+    assert [call[0] for call in calls] == ["Q1 트렌드 근거", "Q4 타이밍 근거"]
+
+
 def test_login_and_invalid_input_stop_before_ai(chat_app):
     client, Session, Chat, calls = chat_app
     assert client.post("/api/chat", json={"mode": "q5", "message": "질문"}).status_code == 401

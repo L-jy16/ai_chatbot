@@ -1,5 +1,6 @@
 """Q6: extend a previous short-form topic into a three-part series."""
 
+import asyncio
 from collections.abc import Sequence
 from typing import Any
 
@@ -26,4 +27,5 @@ def render_prompt(message: str, hot_issues: Sequence[dict[str, Any]]) -> str:
 async def build_prompt(message: str) -> str:
     from app.services.trend import get_hot_issues
 
-    return render_prompt(message, get_hot_issues(limit=5))
+    issues = await asyncio.to_thread(get_hot_issues, limit=5)
+    return render_prompt(message, issues)
