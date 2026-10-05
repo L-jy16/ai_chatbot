@@ -59,3 +59,21 @@ def signup(client):
         return client.post("/api/auth/signup", json={"email": email, "password": password})
 
     return _signup
+
+
+@pytest.fixture
+def login(client):
+    """로그인 요청을 보내는 함수를 돌려준다. login(email=..., password=...)"""
+
+    def _login(email=TEST_EMAIL, password=TEST_PASSWORD):
+        return client.post("/api/auth/login", json={"email": email, "password": password})
+
+    return _login
+
+
+@pytest.fixture
+def logged_in_client(client, signup, login):
+    """가입과 로그인을 마친 TestClient. 로그인이 필요한 API를 테스트할 때 쓴다."""
+    signup()
+    login()
+    return client

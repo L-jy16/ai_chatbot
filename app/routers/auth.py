@@ -1,7 +1,7 @@
 import logging
 
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.errors import APIError
 from app.models import User
-from app.security import MAX_PASSWORD_BYTES, hash_password
+from app.security import MAX_PASSWORD_BYTES, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,29 @@ class SignupRequest(BaseModel):
         return value
 
 
+LOGIN_BLANK_MESSAGE = "이메일과 비밀번호를 입력해 주세요."
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_not_blank(cls, value: str) -> str:
+        email = normalize_email(value)
+        if not email:
+            raise ValueError(LOGIN_BLANK_MESSAGE)
+        return email
+
+    @field_validator("password")
+    @classmethod
+    def password_not_empty(cls, value: str) -> str:
+        if not value:
+            raise ValueError(LOGIN_BLANK_MESSAGE)
+        return value
+
+
 class UserResponse(BaseModel):
     id: int
     email: str
@@ -77,4 +100,21 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> UserResponse:
         raise email_taken(body.email) from None
     db.refresh(user)
     logger.info("signup_success user_id=%s", user.id)
+    return UserResponse(id=user.id, email=user.email)
+
+
+@router.post("/login")
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> UserResponse:
+    user = find_user_by_email(db, body.email)
+    if user is None or not verify_password(body.password, user.password_hash):
+        logger.warning("login_failed email=%s", body.email)
+        raise APIError(
+            status.HTTP_401_UNAUTHORIZED,
+            "INVALID_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않아요.",
+        )
+
+    request.session.clear()
+    request.session["user_id"] = user.id
+    logger.info("login_success user_id=%s", user.id)
     return UserResponse(id=user.id, email=user.email)
