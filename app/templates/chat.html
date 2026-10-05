@@ -15,6 +15,8 @@
       <label for="message">어떤 주제가 궁금한가요? <span id="selected-mode" class="selected-mode">오늘의 주제</span></label>
       <textarea id="message" name="message" rows="3" required maxlength="500" placeholder="예: 금리 인하 주제, 지금 올려도 괜찮을까?" aria-describedby="composer-help char-count"></textarea>
       <p id="chat-error" class="error-message" role="alert" hidden></p>
+      <a id="login-again" class="login-again" href="/login" hidden>다시 로그인하기 ↗</a>
+      <p id="waiting-status" class="waiting-status" role="status" hidden><span class="loading-dot" aria-hidden="true"></span>질문을 정리하고 있어요. 잠시만 기다려 주세요.</p>
       <div class="composer-bottom"><span id="composer-help" class="tiny muted">Enter로 전송 · Shift+Enter로 줄바꿈</span><div><span id="char-count" class="tiny muted">0 / 500</span><button id="send-button" class="button" type="submit">질문 보내기 <span aria-hidden="true">↗</span></button></div></div>
     </form>
     <p class="disclaimer">AI의 답변은 참고 자료입니다. 게시 전 원문 출처와 사실을 직접 확인해 주세요.</p>

@@ -6,6 +6,8 @@ const input = document.querySelector('#message');
 const send = document.querySelector('#send-button');
 const errorBox = document.querySelector('#chat-error');
 const conversation = document.querySelector('#conversation');
+const waiting = document.querySelector('#waiting-status');
+const loginAgain = document.querySelector('#login-again');
 let mode = 'q1';
 
 export function chooseMode(value) { mode = value; }
@@ -46,9 +48,13 @@ form.addEventListener('submit', async (event) => {
     return;
   }
   showError(errorBox, '');
+  loginAgain.hidden = true;
   send.disabled = true;
   input.disabled = true;
   modes.setBusy(true);
+  waiting.hidden = false;
+  form.setAttribute('aria-busy', 'true');
+  send.textContent = '응답 기다리는 중…';
   const pendingQuestion = appendMessage('user', message);
   try {
     const data = await apiRequest('/api/chat', {method: 'POST', body: {mode, message}});
@@ -59,7 +65,11 @@ form.addEventListener('submit', async (event) => {
   } catch (error) {
     pendingQuestion.remove();
     showError(errorBox, error.message);
+    loginAgain.hidden = error.status !== 401;
   } finally {
+    waiting.hidden = true;
+    form.setAttribute('aria-busy', 'false');
+    send.textContent = '질문 보내기 ↗';
     send.disabled = false;
     input.disabled = false;
     modes.setBusy(false);
