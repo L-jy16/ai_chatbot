@@ -1,4 +1,5 @@
 import logging
+import unicodedata
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, status
@@ -23,8 +24,8 @@ INVALID_PASSWORD_MESSAGE = "비밀번호는 8자 이상, 72바이트 이하로 �
 
 
 def normalize_email(value: str) -> str:
-    """대소문자·앞뒤 공백이 달라도 같은 계정으로 보도록 이메일을 정규화한다."""
-    return value.strip().lower()
+    """대소문자·앞뒤 공백·유니코드 표기(NFC/NFD, 전각)가 달라도 같은 계정으로 보도록 정규화한다."""
+    return unicodedata.normalize("NFKC", value).strip().lower()
 
 
 def ensure_utf8(value: str, message: str) -> str:

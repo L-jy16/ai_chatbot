@@ -87,3 +87,20 @@ def test_signup_rejects_unpaired_surrogate_in_email(client):
     response = post_json_text(client, "/api/auth/signup", raw)
     assert response.status_code == 422
     assert response.json() == INVALID_EMAIL
+
+
+CAFE_NFC = "café@example.com"  # é를 한 글자로 쓴 형태
+CAFE_NFD = "café@example.com"  # e + 결합 악센트 두 글자로 쓴 형태 (macOS 입력 등)
+
+
+def test_signup_treats_nfc_and_nfd_email_as_same_account(signup):
+    assert signup(email=CAFE_NFC).status_code == 201
+    response = signup(email=CAFE_NFD)
+    assert response.status_code == 409
+    assert response.json() == EMAIL_TAKEN
+
+
+def test_signup_normalizes_fullwidth_email(signup):
+    response = signup(email="fw@ｅｘａｍｐｌｅ.com")  # 전각 example
+    assert response.status_code == 201
+    assert response.json()["email"] == "fw@example.com"
