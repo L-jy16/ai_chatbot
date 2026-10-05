@@ -1,0 +1,64 @@
+import {apiRequest, showError} from './common.js';
+
+const form = document.querySelector('#chat-form');
+const input = document.querySelector('#message');
+const send = document.querySelector('#send-button');
+const errorBox = document.querySelector('#chat-error');
+const conversation = document.querySelector('#conversation');
+let mode = 'q1';
+
+export function chooseMode(value) { mode = value; }
+
+function appendMessage(kind, text) {
+  document.querySelector('#welcome')?.remove();
+  const article = document.createElement('article');
+  article.className = `message message-${kind}`;
+  const label = document.createElement('p');
+  label.className = 'message-label';
+  label.textContent = kind === 'user' ? '나의 질문' : 'PULSE · 아이디어';
+  const content = document.createElement('div');
+  content.className = 'message-content';
+  content.textContent = text;
+  article.append(label, content);
+  conversation.append(article);
+  conversation.scrollTop = conversation.scrollHeight;
+  return article;
+}
+
+input.addEventListener('input', () => {
+  document.querySelector('#char-count').textContent = `${input.value.length} / 500`;
+});
+input.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (send.disabled) return;
+  const message = input.value.trim();
+  if (!message || message.length > 500) {
+    showError(errorBox, '질문은 공백을 제외하고 1~500자로 입력해 주세요.');
+    input.focus();
+    return;
+  }
+  showError(errorBox, '');
+  send.disabled = true;
+  input.disabled = true;
+  const pendingQuestion = appendMessage('user', message);
+  try {
+    const data = await apiRequest('/api/chat', {method: 'POST', body: {mode, message}});
+    if (typeof data.answer !== 'string' || !data.answer.trim()) throw new Error('응답 내용이 비어 있습니다. 잠시 후 다시 시도해 주세요.');
+    appendMessage('assistant', data.answer);
+    input.value = '';
+    document.querySelector('#char-count').textContent = '0 / 500';
+  } catch (error) {
+    pendingQuestion.remove();
+    showError(errorBox, error.message);
+  } finally {
+    send.disabled = false;
+    input.disabled = false;
+    input.focus();
+  }
+});
