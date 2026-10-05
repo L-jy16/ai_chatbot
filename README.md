@@ -2,7 +2,7 @@
 
 유튜브 경제·AI 숏폼 제작자가 오늘의 주제, 게시 타이밍, 새로운 관점, 후속 시리즈를 질문하는 FastAPI 서비스입니다. 최근·과거 트렌드 데이터를 서버의 LLM 프롬프트에 넣는 구조를 목표로 합니다.
 
-**현재 상태:** `feature/ui`에서 D의 UI·로그 조회·SQL·문서를 구현했습니다. 시작 시 저장소에는 README와 참고 PDF만 있었습니다. A의 기반·인증, B의 네이버 데이터, C의 실제 AI·대화 저장은 아직 이 저장소에 없어 독립 데모로 D를 검증합니다. 실제 회원가입·AI·영구 DB 통합은 대기 상태입니다. **배포는 사용자 요청으로 제외했습니다.**
+**현재 상태:** 최신 `origin/develop`의 A 기반·인증 코드와 D의 UI·로그 조회·SQL·문서를 통합했습니다. A의 실제 회원가입·로그인·로그아웃 API와 users DB는 구현되어 있습니다. B의 네이버 데이터와 C의 Chat·AI 코드는 아직 develop에 포함되지 않았으므로, 전체 화면은 독립 데모로 검증합니다. 실제 앱에 D 화면·로그 API를 등록하는 작업은 C의 Chat 모델 준비 후 진행합니다. **배포는 사용자 요청으로 제외했습니다.**
 
 ## D 구현 범위
 
@@ -27,7 +27,7 @@ Windows PowerShell:
 
 ```powershell
 python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements-ui-dev.txt
+./.venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-ui-dev.txt
 ./.venv/Scripts/python.exe -m uvicorn dev.demo_app:app --host 127.0.0.1 --port 8000
 ```
 
@@ -35,7 +35,7 @@ Linux/macOS:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-ui-dev.txt
+.venv/bin/python -m pip install -r requirements.txt -r requirements-ui-dev.txt
 .venv/bin/python -m uvicorn dev.demo_app:app --host 127.0.0.1 --port 8000
 ```
 
@@ -57,6 +57,24 @@ python3 -m venv .venv
 5. 내 기록에서 질문·응답·시각·성공/실패 상태를 확인합니다.
 6. 로그아웃 후 `/`, `/history`, `/api/me/chats` 접근 차단을 확인합니다.
 
+## 실제 프로젝트 기반·인증 실행
+
+`origin/develop`의 A 앱은 `requirements.txt`의 고정 버전을 사용합니다. 위 의존성 설치 후 `.env.example`을 `.env`로 복사하고, 무작위 서명 키를 생성해 `.env`의 `SECRET_KEY`에 입력합니다.
+
+```powershell
+Copy-Item .env.example .env
+./.venv/Scripts/python.exe -c "import secrets; print(secrets.token_hex(32))"
+# 출력값을 .env의 SECRET_KEY에 입력한 뒤 실행
+./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+```
+
+Linux/macOS에서는 `cp .env.example .env`, `.venv/bin/python`을 사용합니다. `SECRET_KEY`는 필수이며 16자 이상이어야 합니다. 첫 실행 시 기본 `app.db`와 users 테이블을 생성합니다.
+
+- 상태 확인: `GET http://127.0.0.1:8000/health` → `{"status":"ok"}`.
+- API 문서: `http://127.0.0.1:8000/docs`.
+- 실제 인증: 가입 201, 로그인 200과 세션 쿠키, 로그아웃 204(응답 본문 없음).
+- 현재 A 앱에는 D 페이지·Chat 모델이 등록되지 않았습니다. 전체 UI 확인은 위의 `dev.demo_app:app`을 사용합니다.
+
 ## 구조와 담당
 
 ```text
@@ -69,11 +87,13 @@ python3 -m venv .venv
 
 ```text
 app/
-├── main.py, config.py, database.py     # A: 통합 시 추가
-├── models/user.py                     # A: 통합 시 추가
+├── main.py, config.py, database.py     # A: origin/develop에서 통합
+├── dependencies.py, errors.py         # A: 인증 의존성·공통 오류
+├── security.py, models/user.py        # A: bcrypt·User
 ├── models/chat.py                     # C: 통합 시 추가
 ├── routers/
-│   ├── auth.py, chat.py                # A/C: 통합 시 추가
+│   ├── auth.py                        # A: 실제 인증 API
+│   ├── chat.py                        # C: 통합 시 추가
 │   ├── pages.py                       # D
 │   └── logs.py                        # D
 ├── services/                          # B/C: 통합 시 추가
@@ -88,13 +108,13 @@ tests/test_ui.py                       # D: API·SQL 검사
 
 ## A·C 코드에 연결
 
-FastAPI 앱, SessionMiddleware, `require_login`, 동기 SQLAlchemy `get_db`, C의 `Chat` 모델이 준비되면 A의 `main.py`에 한 번 등록합니다. 아래 import는 팀 코드에 맞춰 조정합니다.
+FastAPI 앱, SessionMiddleware, `require_login`, 동기 SQLAlchemy `get_db`는 A 코드에 준비되어 있습니다. C의 `Chat` 모델이 준비되면 A의 `main.py`에 한 번 등록합니다.
 
 ```python
-# A/C가 구현할 모듈입니다. 현재 데모로 대체하지 않습니다.
+# A의 실제 의존성과 C가 구현할 Chat을 사용합니다.
 from app.database import get_db
+from app.dependencies import require_login
 from app.models.chat import Chat
-from app.routers.auth import require_login
 from app.ui import install_ui
 
 # A가 생성하고 SessionMiddleware를 설정한 app에 등록
@@ -107,24 +127,24 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 
 - 최신 mode는 q1~q5입니다. Q2에서는 최근 업로드 주제를 먼저 입력받아 `최근 업로드 주제: ...\n질문: ...` 형태의 message로 전달하며 전체 500자 제한을 검사합니다. 기존 q4/q5/q6 의미와 달라 C의 검증·분기도 함께 맞춰야 합니다. 기존 번호로 저장된 기록은 팀이 변환 범위를 확인합니다.
 
-- 로그인 시 A는 `request.session["user_id"]`에 양의 **정수 ID**를 저장하고 로그아웃 시 세션을 지웁니다.
-- `require_login`은 비로그인을 401로 차단하고 정수 ID·`User.id`·`{"id": 정수}` 중 하나를 반환합니다. 삭제된 사용자·만료 계정은 A에서 검사합니다.
+- A는 로그인 시 `request.session["user_id"]`에 정수 ID를 저장하고 로그아웃 시 세션을 지웁니다.
+- `app.dependencies.require_login`은 비로그인을 401로 차단하고 실제 `User`를 반환합니다. 삭제된 사용자 세션은 `get_current_user`가 비웁니다. D 로그 라우터는 이 User의 ID를 사용합니다.
 - `get_db()`는 **동기 SQLAlchemy Session**을 yield하고 닫습니다. AsyncSession은 현재 로그 라우터와 호환되지 않습니다.
 - C의 `Chat`은 `id`, `user_id`, `mode`, `question`, nullable `answer`, `status`, `created_at` 속성을 갖습니다.
-- 인증 요청은 JSON `{email, password}`로 합의합니다. 로그인은 200 및 세션 쿠키, 가입은 200/201 후 로그인 화면으로 이동합니다. 가입 직후 세션 발급 방식도 페이지 리다이렉트로 동작합니다.
-- 가입 화면은 비밀번호 8~128자를 검사합니다. 최종 정책과 서버 검증은 A가 결정하고 화면과 맞춥니다. 클라이언트 검증은 서버 검증을 대신하지 않습니다.
+- 실제 인증 요청은 JSON `{email, password}`입니다. 로그인은 200 및 세션 쿠키, 가입은 201 후 로그인 화면으로 이동하고 로그아웃은 204입니다.
+- 가입 화면은 비밀번호 8~128자를 검사하며 A의 서버는 최종적으로 8자 이상·UTF-8 72바이트 이하를 검증합니다. 바이트 제한을 넘으면 서버 오류 안내를 표시합니다. 클라이언트 검증은 서버 검증을 대신하지 않습니다.
 - C의 AI timeout은 브라우저 제한 65초보다 짧게 설정합니다. 브라우저 연결이 끊겨도 서버가 저장할 수 있어 시간 초과 안내는 내 기록 확인을 요청합니다.
 - API 오류는 `{error, message}`를 우선 사용합니다. 문자열 `detail`과 FastAPI 검증 오류 배열도 표시합니다.
 
 ## API 명세
 
-인증·채팅은 A/C의 **팀 계약**입니다. 데모 대체 동작과 구분합니다. 내 기록 API는 D의 실제 구현입니다.
+인증은 A의 실제 구현, 채팅은 C의 **팀 계약**, 내 기록은 D의 실제 라우터 구현입니다. D 라우터 등록과 실제 Chat 연결은 대기 상태이며 데모 대체 동작과 구분합니다.
 
 | 메서드 | 경로 | 인증 | 설명 / 담당 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/signup` | X | 가입 A, 화면 D / 데모는 503 |
-| POST | `/api/auth/login` | X | 세션 발급 A / 데모 예시 로그인 |
-| POST | `/api/auth/logout` | O | 세션 종료 A, 버튼 D |
+| POST | `/api/auth/signup` | X | A 실제 가입 201, 화면 D / 데모는 503 |
+| POST | `/api/auth/login` | X | A 실제 로그인 200 / 데모 예시 로그인 |
+| POST | `/api/auth/logout` | O | A 실제 로그아웃 204, 버튼 D |
 | POST | `/api/chat` | O | AI 호출·저장 C / 데모 고정 응답 |
 | GET | `/api/me/chats?limit=20` | O | 내 기록 JSON D |
 | GET | `/`, `/history` | O | 페이지 D, 비로그인 303 `/login` |
@@ -169,7 +189,7 @@ install_ui(app, require_login=require_login, get_db=get_db, chat_model=Chat)
 
 ## DB 구조·확인 가이드
 
-7-1의 **목표 스키마**입니다. User·Chat 모델과 테이블 생성은 A·C 담당입니다. 데모는 별도의 `chats` 테스트 테이블만 메모리에 생성합니다.
+7-1의 **목표 스키마**입니다. User와 users 테이블 생성은 A에 구현되어 있고 Chat은 C 통합을 기다립니다. 데모는 별도의 `chats` 테스트 테이블만 메모리에 생성합니다.
 
 ```mermaid
 erDiagram
@@ -212,17 +232,17 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 
 ## 환경 변수·민감정보
 
-브라우저는 같은 출처의 `/api/*`만 요청하고 AI·네이버 키를 읽지 않습니다. 다음은 **팀 통합용 제안 이름**으로 실제 A/B/C config와 맞춰야 합니다.
+브라우저는 같은 출처의 `/api/*`만 요청하고 AI·네이버 키를 읽지 않습니다. 설정 이름은 `origin/develop`의 `app/config.py`를 기준으로 합니다.
 
 | 이름 | 담당 / 용도 |
 | --- | --- |
-| `SESSION_SECRET` | A / 세션 서명용 무작위 비밀값 |
-| `DATABASE_URL` | A / SQLite 연결 URL |
+| `SECRET_KEY` | A / 필수 세션 서명 키, 16자 이상 |
+| `DATABASE_URL` | A / 기본 `sqlite:///./app.db` |
 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | B / 네이버 인증 |
-| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | C / 제공자 설정 |
-| `LLM_TIMEOUT_SECONDS` | C / 서버 AI 호출 제한 |
+| `LLM_API_KEY`, `LLM_MODEL` | C / API 키·모델, 기본 빈 값 |
+| `LLM_TIMEOUT_SECONDS` | C / 서버 AI 호출 제한, 기본 30초 |
 
-`.env.example`에는 이름만 있습니다. `.env`로 복사해 값을 채우고 A의 config에서 로드합니다. **D 데모는 `.env`를 읽지 않으며** API 키 없이 실행됩니다. `.gitignore`에서 `.env`, 가상환경, DB, 임시 캡처를 제외합니다. 실제 비밀값·회원 비밀번호·세션 쿠키를 문서나 JS·커밋에 넣지 않습니다.
+`.env.example`에는 비밀값 없이 이름과 안전한 기본값만 있습니다. `.env`로 복사해 `SECRET_KEY` 등 로컬 값을 채우면 A의 config에서 로드합니다. **D 데모는 `.env`를 읽지 않으며** API 키 없이 실행됩니다. `.gitignore`에서 `.env`와 파생 환경 파일, 가상환경, DB, 임시 캡처, OS·IDE 파일을 제외합니다.
 
 페이지 CSP는 같은 출처의 스크립트·스타일·연결만 허용합니다. 질문·AI 응답·기록은 `textContent`로 표시해 HTML 실행을 방지합니다.
 
@@ -232,7 +252,7 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 ./.venv/Scripts/python.exe -m pytest -q --basetemp tmp/test-runs/local
 ```
 
-**40개 테스트 통과.** 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 다섯 모드 저장·조회, Q2 업로드 맥락·추가 질문, timeout/error 후 재시도, SQL 읽기 전용 검사를 확인했습니다. 현재 FastAPI/Starlette 조합에서 httpx 관련 deprecation warning 1건이 있으며 실패는 아닙니다.
+D의 **40개 테스트**는 비로그인·변조 세션 차단, 사용자별 기록 분리, 최신순·limit·null, DB 실패 503, 다섯 모드 저장·조회, Q2 업로드 맥락·추가 질문, timeout/error 후 재시도, SQL 읽기 전용을 검증합니다. `pytest`는 원격 A의 인증·설정·DB·보안 테스트도 함께 실행합니다. 테스트는 임시 SQLite를 사용하며 실제 `app.db`를 수정하지 않습니다. `tests/conftest.py`에서 외부 API 키를 비워 유료 호출을 방지합니다. A의 `httpx2` 의존성도 유지합니다.
 
 브라우저 검사(선택 사항, 별도 터미널에서 데모 실행):
 
@@ -249,16 +269,16 @@ curl -b /tmp/pulse-cookie.txt 'http://127.0.0.1:8000/api/me/chats?limit=20'
 
 ## 팀 역할·개인별 작업 요약
 
-이름은 팀에서 확정합니다. 이번 브랜치에 구현된 것은 D 행입니다.
+이름은 팀에서 확정합니다. A 코드는 `origin/develop`에서 통합했고 D 작업을 현재 브랜치에 추가했습니다.
 
 | 역할 | 브랜치 | 계획 / 현재 상태 |
 | --- | --- | --- |
-| A | feature/auth | 기반, config, DB, User, 회원가입·세션 / 코드 대기 |
+| A | feature/auth | 기반, config, DB, User, 회원가입·세션 / origin/develop에서 통합 |
 | B | feature/trend | 네이버, 추이 비교, Q1·Q3 데이터 / 코드 대기, Q2 연계는 팀 합의 |
 | C | feature/chat | Chat, LLM, 컨텍스트, mode, 저장, Q4·Q5 / 코드 대기, Q2 대화 흐름 추가 필요 |
 | D | feature/ui | 4개 화면·공통 스타일, 다섯 모드·Q2 업로드 맥락·오류·대기, 기록 API·SQL, 데모·테스트·통합 문서 완료. 배포 제외 |
 
-D의 변경은 `feature/ui`에 기능별 커밋으로 기록했습니다. `git log --oneline feature/ui`로 확인합니다. 팀 협업 계획은 `feature/* → develop → main`, PR 기반 merge commit, 팀원 1명 이상 승인입니다. 이 작업에서 GitHub push·PR 게시·merge·develop/main 변경은 하지 않았습니다. PR 설명 초안·분할안은 `docs/D_PR_DRAFTS.md`에 있습니다. 커밋 작성자와 제출 팀원은 실제 Git 설정·작업자 기준으로 확인하세요.
+D의 변경은 `feature/ui`에 기능별 커밋으로 기록했습니다. `git log --oneline feature/ui`로 확인합니다. 팀 협업 계획은 `feature/* → develop → main`, PR 기반 merge commit, 팀원 1명 이상 승인입니다. [D PR #4](https://github.com/L-jy16/ai_chatbot/pull/4)는 develop 대상이며 최신 origin/develop을 feature/ui에 합쳐 공통 설정·문서 충돌을 해결했습니다. develop PR의 최종 승인은 팀 리뷰로 진행합니다. A의 세부 설계는 [auth-design.md](docs/auth-design.md), D 전달서는 [D_HANDOFF.md](docs/D_HANDOFF.md)를 참고하세요.
 
 ## 통합 후 남은 검증
 
