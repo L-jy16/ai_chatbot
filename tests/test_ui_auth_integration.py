@@ -46,13 +46,18 @@ def test_pending_apis_still_require_real_login(client):
     assert client.get('/api/me/chats').status_code == 401
 
 
-def test_missing_chat_backend_is_explicit_not_mock(logged_in_client):
-    chat = logged_in_client.post('/api/chat', json={'mode': 'q1', 'message': '질문'})
-    assert chat.status_code == 503
-    assert chat.json()['error'] == 'CHAT_NOT_READY'
+def test_connected_backend_uses_real_history(logged_in_client, monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services import llm
+    from app.services.scenarios import q1
+    monkeypatch.setattr(q1, 'build_prompt', AsyncMock(return_value='참고 자료'))
+    monkeypatch.setattr(llm, 'ask_llm', AsyncMock(return_value='실제 경로 테스트 응답'))
+    response = logged_in_client.post('/api/chat', json={'mode': 'q1', 'message': '질문'})
+    assert response.status_code == 200
     history = logged_in_client.get('/api/me/chats')
-    assert history.status_code == 503
-    assert history.json()['error'] == 'HISTORY_NOT_READY'
+    assert history.status_code == 200
+    assert history.json()[0]['answer'] == '실제 경로 테스트 응답'
+    assert history.headers['cache-control'] == 'no-store'
     page = logged_in_client.get('/')
-    assert '채팅과 대화 기록 기능은 준비 중' in page.text
-    assert 'id="send-button" class="button" type="submit" disabled' in page.text
+    assert '채팅과 대화 기록 기능은 준비 중' not in page.text
+    assert 'id="send-button" class="button" type="submit" disabled' not in page.text

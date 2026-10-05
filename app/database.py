@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
@@ -29,6 +29,16 @@ def create_db_engine(url: str) -> Engine:
 
 engine = create_db_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
+
+
+def upgrade_chat_schema(db_engine: Engine) -> None:
+    """이전 대화의 mode 값을 보존하며 시나리오 버전만 추가한다. 반복 실행 가능."""
+    inspector = inspect(db_engine)
+    if "chats" not in inspector.get_table_names():
+        return
+    if "scenario_version" not in {c["name"] for c in inspector.get_columns("chats")}:
+        with db_engine.begin() as connection:
+            connection.execute(text("ALTER TABLE chats ADD COLUMN scenario_version INTEGER NOT NULL DEFAULT 1"))
 
 
 def get_db() -> Iterator[Session]:

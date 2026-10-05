@@ -7,8 +7,9 @@ pydantic-settings==2.15.0
 email-validator==2.3.0
 bcrypt==5.0.0
 itsdangerous==2.2.0
+requests==2.34.2
+httpx2==2.13.1
 Jinja2==3.1.6
 
 # 테스트
 pytest==9.1.1
-httpx2==2.13.1

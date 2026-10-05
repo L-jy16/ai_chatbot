@@ -4,7 +4,7 @@ import logging
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -20,6 +20,16 @@ class ChatLog(BaseModel):
     answer: str | None
     status: str
     created_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_mode(cls, value):
+        # 기존 DB의 Q4 타이밍을 새 UI의 '새로운 각도'로 오표시하지 않는다.
+        if getattr(value, "scenario_version", 2) == 1:
+            row = {name: getattr(value, name) for name in cls.model_fields}
+            row["mode"] = {"q4": "q3", "q5": "q4", "q6": "q5"}.get(row["mode"], row["mode"])
+            return row
+        return value
 
 
 def authenticated_user_id(user: Any) -> int:
