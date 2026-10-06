@@ -567,6 +567,9 @@ erDiagram
 
 | 문서 | 내용 |
 | --- | --- |
+| [핵심 평가 질문·답안 30선](docs/EVALUATION_PRIORITY_QA.md) | 제공된 평가 기준 30개에 대한 우선 질문·답안, 코드 근거, 현장 시연 순서 |
+| [예상 질문 100선](docs/EXPECTED_QUESTIONS_100.md) | 평가 기준 우선 30문항과 설계·보안·DB·AI·운영·개인 기여 심화 70문항 |
+| [답안 100선](docs/EXPECTED_ANSWERS_100.md) | 동일 문항 번호의 답안·근거 파일·시연 방법, 구현과 개선 과제 구분 |
 | [다이어그램 전체 미리보기](docs/images/diagrams/00-overview.png) | DB ERD·아키텍처·시스템 처리 흐름·팀 역할 이미지 4장 |
 | [다이어그램 원본 안내](docs/images/diagrams/README.md) | PNG·SVG 파일, 작성 기준과 이미지 재생성 방법 |
 | [개발 계획 PDF](<PDF/7-1경제 숏폼 트렌드 챗봇 팀 개발 계획.pdf>) | 최초 범위·시스템 설계·A~D 분담·협업 규칙 |
