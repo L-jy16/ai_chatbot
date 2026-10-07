@@ -552,7 +552,7 @@ erDiagram
 
 | 역할 | 작업자(깃네임) | 브랜치 · PR | 개인별 작업 요약 |
 | --- | --- | --- | --- |
-| A | **김준택** ([rlawnsxo8709](https://github.com/rlawnsxo8709)) | `feature/auth` (#2), 통합 (#3), 배포 문서 (#6) | FastAPI 골격(설정·SQLite 연결·공통 에러 형식·로깅), User 모델과 bcrypt 해싱, 회원가입·로그인·로그아웃(세션 쿠키), `require_login`·`get_current_user` 의존성, 가입 입력 검증과 보안 보강(72바이트 비밀번호, 유니코드 이메일 정규화, 로그 마스킹), 인증 테스트와 공용 테스트 fixture. 통합: 화면 Q1~Q5와 시나리오 연결, LLM 응답 토큰·타임아웃 조정, systemd 서비스 파일·배포 가이드·README |
+| A | **김준태** ([rlawnsxo8709](https://github.com/rlawnsxo8709)) | `feature/auth` (#2), 통합 (#3), 배포 문서 (#6) | FastAPI 골격(설정·SQLite 연결·공통 에러 형식·로깅), User 모델과 bcrypt 해싱, 회원가입·로그인·로그아웃(세션 쿠키), `require_login`·`get_current_user` 의존성, 가입 입력 검증과 보안 보강(72바이트 비밀번호, 유니코드 이메일 정규화, 로그 마스킹), 인증 테스트와 공용 테스트 fixture. 통합: 화면 Q1~Q5와 시나리오 연결, LLM 응답 토큰·타임아웃 조정, systemd 서비스 파일·배포 가이드·README |
 | B | **이지영** ([L-jy16](https://github.com/L-jy16)) | `feature/trend` (#5) | 네이버 API 클라이언트, 뉴스 검색·오늘의 경제 이슈, 데이터랩 검색 추이 조회·최근/과거 비교·상승/하락 판정, Q1 오늘의 주제·Q2 운영 채널 추천·Q3 타이밍 체크 프롬프트, 인증·트렌드·AI·D 화면 1차 연결 |
 | C | **정지환** ([cds-jihwan](https://github.com/cds-jihwan)) | `feature/chat` (#3) | 코디세이 LLM 클라이언트(타임아웃·오류 처리), Chat 모델, `POST /api/chat`(입력 검증·최근 5쌍 문맥·모드 분기), 요청·AI·DB 이벤트 로깅, AI 실패 기록과 DB 롤백, Q4 새로운 각도·Q5 다음 편 프롬프트(`scenarios/q5.py`·`q6.py`), 채팅 API 테스트 |
 | D | **김정현** ([Kfri-cloud](https://github.com/Kfri-cloud)) | `feature/ui` (#4) | 공통 템플릿·반응형 스타일, 로그인·회원가입·채팅·내 기록 화면, 모드 선택·예시 질문, 대기·오류·세션 만료 안내, 사용자별 기록 API `GET /api/me/chats`, DB 확인 SQL·스크립트, 독립 데모 앱, 브라우저 검사 |
