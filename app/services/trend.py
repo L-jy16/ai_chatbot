@@ -11,13 +11,16 @@ import requests
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-NAVER_NEWS_URL = 'https://openapi.naver.com/v1/search/news.json'
-NAVER_DATALAB_URL = 'https://openapi.naver.com/v1/datalab/search'
+# 네이버 검색·데이터랩 API는 네이버 클라우드 플랫폼의 NAVER API HUB로 이관되었다.
+# 키(Client ID·Secret)는 HUB Application에서 발급하며, 쓰려는 API(뉴스 검색, 검색어 트렌드)를 Application에 켜 두어야 한다.
+NAVER_API_HUB = 'https://naverapihub.apigw.ntruss.com'
+NAVER_NEWS_URL = f'{NAVER_API_HUB}/search/v1/news'
+NAVER_DATALAB_URL = f'{NAVER_API_HUB}/search-trend/v1/search'
 
 
 def _get_headers() -> dict[str, str]:
-    return {'X-Naver-Client-Id': settings.NAVER_CLIENT_ID,
-            'X-Naver-Client-Secret': settings.NAVER_CLIENT_SECRET,
+    return {'X-NCP-APIGW-API-KEY-ID': settings.NAVER_CLIENT_ID,
+            'X-NCP-APIGW-API-KEY': settings.NAVER_CLIENT_SECRET,
             'Content-Type': 'application/json'}
 
 
