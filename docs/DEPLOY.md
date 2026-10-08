@@ -1,12 +1,12 @@
 # 배포 가이드 (Ubuntu VM + uvicorn + systemd)
 
-VM 1대에 앱을 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속할 수 있게 만드는 절차입니다. Ubuntu 22.04(Python 3.10) 또는 24.04(Python 3.12) 기준입니다.
+VM 1대에 앱을 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속할 수 있게 만드는 절차입니다. AWS EC2에 Nginx(80)를 앞에 두고 8000을 열지 않는 구성은 [DEPLOY-AWS.md](DEPLOY-AWS.md)를 보세요. Ubuntu 22.04(Python 3.10) 또는 24.04(Python 3.12) 기준입니다.
 
 ## 0. 준비물
 
 - 공인 IP가 있는 Ubuntu VM과 SSH 접속
 - 클라우드 콘솔의 보안 그룹(방화벽)에서 **인바운드 TCP 8000** 허용 (소스 `0.0.0.0/0`)
-- 키: `LLM_API_KEY`(Codyssey), `NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`(네이버 개발자센터, 검색·데이터랩 API 등록). `SECRET_KEY`는 서버에서 새로 만듭니다.
+- 키: `LLM_API_KEY`(Codyssey), `NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`(네이버 클라우드 플랫폼 NAVER API HUB Application, 뉴스 검색·검색어 트렌드 API를 켜 둔 것). `SECRET_KEY`는 서버에서 새로 만듭니다.
 
 아래 명령은 사용자 `ubuntu`, 설치 경로 `/home/ubuntu/ai_chatbot` 기준입니다. 다르면 경로를 바꿔 실행하세요.
 
@@ -48,7 +48,7 @@ chmod 600 .env   # 소유자만 읽을 수 있게
 | --- | --- |
 | `SECRET_KEY` | 위에서 만든 64자 값 (16자 이상 필수, 비어 있으면 서버가 시작되지 않음) |
 | `DATABASE_URL` | `sqlite:////home/ubuntu/ai_chatbot/app.db` (절대 경로 권장, 슬래시 4개) |
-| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 개발자센터 애플리케이션의 Client ID(20자)·Client Secret(10자) |
+| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | NAVER API HUB Application의 Client ID(10자)·Client Secret(40자). Application에 **뉴스 검색**과 **검색어 트렌드** API가 켜져 있어야 한다. 사용량 초과 시 과금되므로 [한도 및 알림]을 설정해 둔다 |
 | `LLM_API_KEY` | Codyssey AI 키 |
 | `LLM_BASE_URL`, `LLM_MODEL` | `.env.example` 값 그대로 (`https://copa.codyssey.kr/v1`, `gpt-5-mini`) |
 | `LLM_TIMEOUT_SECONDS` | `50` (추론 모델 응답이 30초를 넘을 수 있음. 브라우저 제한 65초보다 짧게 유지) |
@@ -155,7 +155,7 @@ sudo nginx -t && sudo systemctl reload nginx
 | 외부에서 접속 안 됨 | 보안 그룹 8000, `sudo ufw status`, `ss -ltnp \| grep 8000`에서 `0.0.0.0:8000`인지 |
 | 채팅이 502 `AI_ERROR` | 로그의 `ai_call_fail ... detail=` 사유. `LLM_API_KEY`·`LLM_MODEL`·`LLM_BASE_URL` |
 | 채팅이 504 `AI_TIMEOUT` | `LLM_TIMEOUT_SECONDS`(권장 50, 60 이하) |
-| 답변에 트렌드 자료가 없음 | 로그의 `naver_unavailable`(키 없음)·`naver_request_failed`(인증 실패 등). Client ID 20자·Secret 10자인지, 애플리케이션에 검색·데이터랩 API가 등록됐는지 |
+| 답변에 트렌드 자료가 없음 | 로그의 `naver_unavailable`(키 없음)·`naver_request_failed`(인증 실패 등). 키가 NAVER API HUB에서 발급한 것(Client ID 10자·Secret 40자)인지, Application에 뉴스 검색·검색어 트렌드 API가 켜져 있는지. 켜지 않은 API는 HUB가 401 "요청한 API는 이 Application에서 활성화되어 있지 않습니다"를 돌려준다 |
 | `.env`를 바꿨는데 그대로 | `sudo systemctl restart ai-chatbot` |
 
 ## 보안 메모
