@@ -40,8 +40,27 @@ def test_client_reads_shared_settings_and_cleans_news(monkeypatch):
     get=Mock(return_value=response)
     monkeypatch.setattr(trend.requests,'get',get)
     assert trend.search_news()[0]['title']=='금리 & 환율'
-    assert get.call_args.kwargs['headers']['X-Naver-Client-Id']=='test-id'
+    assert get.call_args.args[0]=='https://naverapihub.apigw.ntruss.com/search/v1/news'
+    headers=get.call_args.kwargs['headers']
+    assert headers['X-NCP-APIGW-API-KEY-ID']=='test-id'
+    assert headers['X-NCP-APIGW-API-KEY']=='test-secret'
+    assert 'X-Naver-Client-Id' not in headers and 'X-Naver-Client-Secret' not in headers
     assert get.call_args.kwargs['timeout']>0
+
+
+def test_datalab_uses_naver_api_hub_search_trend(monkeypatch):
+    monkeypatch.setattr(settings,'NAVER_CLIENT_ID','test-id')
+    monkeypatch.setattr(settings,'NAVER_CLIENT_SECRET','test-secret')
+    response=Mock()
+    response.json.return_value={'results':[{'data':[{'period':'2026-10-01','ratio':50}]}]}
+    post=Mock(return_value=response)
+    monkeypatch.setattr(trend.requests,'post',post)
+    assert trend._request_datalab('금리','2026-09-25','2026-10-08')==[{'period':'2026-10-01','ratio':50}]
+    assert post.call_args.args[0]=='https://naverapihub.apigw.ntruss.com/search-trend/v1/search'
+    headers=post.call_args.kwargs['headers']
+    assert headers['X-NCP-APIGW-API-KEY-ID']=='test-id'
+    assert headers['X-NCP-APIGW-API-KEY']=='test-secret'
+    assert post.call_args.kwargs['json']['keywordGroups']==[{'groupName':'금리','keywords':['금리']}]
 
 
 def test_naver_failure_does_not_log_secrets(monkeypatch,caplog):
