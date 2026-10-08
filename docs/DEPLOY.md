@@ -1,6 +1,6 @@
 # 배포 가이드 (Ubuntu VM + uvicorn + systemd)
 
-VM 1대에 앱을 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속할 수 있게 만드는 절차입니다. Ubuntu 22.04(Python 3.10) 또는 24.04(Python 3.12) 기준입니다.
+VM 1대에 앱을 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속할 수 있게 만드는 절차입니다. AWS EC2에 Nginx(80)를 앞에 두고 8000을 열지 않는 구성은 [DEPLOY-AWS.md](DEPLOY-AWS.md)를 보세요. Ubuntu 22.04(Python 3.10) 또는 24.04(Python 3.12) 기준입니다.
 
 ## 0. 준비물
 
