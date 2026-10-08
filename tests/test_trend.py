@@ -25,6 +25,26 @@ def test_comparison(past,recent,expected,monkeypatch):
     assert result['recent']==recent and result['past']==past
 
 
+def test_yesterday_not_published_yet_falls_back_one_day(monkeypatch):
+    # 새벽에는 네이버 데이터랩에 어제 수치가 아직 없다. 그저께까지 14일로 비교한다.
+    yesterday=datetime.now(ZoneInfo('Asia/Seoul')).date()-timedelta(days=1)
+    data=[{'period':(yesterday-timedelta(days=14-i)).isoformat(),'ratio':30 if i<7 else 60} for i in range(14)]
+    requested=[]
+    monkeypatch.setattr(trend,'_request_datalab',lambda k,s,e:requested.append((s,e)) or data)
+    result=trend.compare_periods('금리')
+    assert result['available'] is True and result['trend']=='rising'
+    assert result['recent_end']==(yesterday-timedelta(days=1)).isoformat()
+    assert result['past_start']==(yesterday-timedelta(days=14)).isoformat()
+    assert requested==[((yesterday-timedelta(days=14)).isoformat(),yesterday.isoformat())]
+
+
+def test_two_missing_latest_days_stay_unknown(monkeypatch):
+    yesterday=datetime.now(ZoneInfo('Asia/Seoul')).date()-timedelta(days=1)
+    data=[{'period':(yesterday-timedelta(days=15-i)).isoformat(),'ratio':50} for i in range(14)]
+    monkeypatch.setattr(trend,'_request_datalab',lambda *args:data)
+    assert trend.compare_periods('금리')['available'] is False
+
+
 @pytest.mark.parametrize('data',[[],points(0,0),points(30,60)[:7],[{'period':'invalid','ratio':'bad'}]])
 def test_missing_data_is_unknown(monkeypatch,data):
     monkeypatch.setattr(trend,'_request_datalab',lambda *args:data)
