@@ -1,0 +1,21 @@
+# PULSE 챗봇 systemd 서비스 파일
+# 설치: sudo cp deploy/ai-chatbot.service /etc/systemd/system/ai-chatbot.service
+# User와 경로(/home/ubuntu/ai_chatbot)는 서버 환경에 맞게 바꾼다. 자세한 절차는 docs/DEPLOY.md 참고.
+
+[Unit]
+Description=PULSE economy short-form trend chatbot (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+# 앱이 이 폴더의 .env를 직접 읽는다(pydantic-settings). 키를 이 파일에 적지 않는다.
+WorkingDirectory=/home/ubuntu/ai_chatbot
+# SQLite를 쓰므로 워커는 1개로 둔다. 0.0.0.0으로 열어야 외부에서 접속할 수 있다.
+ExecStart=/home/ubuntu/ai_chatbot/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

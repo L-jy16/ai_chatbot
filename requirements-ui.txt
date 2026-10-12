@@ -1,0 +1,6 @@
+# D UI dependencies; merge with A's requirements.txt during integration.
+fastapi>=0.115,<1
+Jinja2>=3.1.6,<4
+SQLAlchemy>=2.0,<3
+itsdangerous>=2.2,<3
+uvicorn>=0.30,<1

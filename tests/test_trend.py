@@ -1,0 +1,107 @@
+import asyncio
+import json
+from datetime import datetime, timedelta
+from unittest.mock import Mock
+from zoneinfo import ZoneInfo
+
+import pytest
+import requests
+
+from app.config import settings
+from app.services import trend
+from app.services.scenarios import q1, q3
+
+
+def points(past, recent):
+    end=datetime.now(ZoneInfo('Asia/Seoul')).date()-timedelta(days=1)
+    return [{'period':(end-timedelta(days=13-i)).isoformat(),'ratio':past if i<7 else recent} for i in range(14)]
+
+
+@pytest.mark.parametrize('past,recent,expected',[(30,60,'rising'),(60,30,'falling'),(90,90,'peak'),(30,30,'stable')])
+def test_comparison(past,recent,expected,monkeypatch):
+    monkeypatch.setattr(trend,'_request_datalab',lambda *args: points(past,recent))
+    result=trend.compare_periods('금리')
+    assert result['trend']==expected and result['available'] is True
+    assert result['recent']==recent and result['past']==past
+
+
+def test_yesterday_not_published_yet_falls_back_one_day(monkeypatch):
+    # 새벽에는 네이버 데이터랩에 어제 수치가 아직 없다. 그저께까지 14일로 비교한다.
+    yesterday=datetime.now(ZoneInfo('Asia/Seoul')).date()-timedelta(days=1)
+    data=[{'period':(yesterday-timedelta(days=14-i)).isoformat(),'ratio':30 if i<7 else 60} for i in range(14)]
+    requested=[]
+    monkeypatch.setattr(trend,'_request_datalab',lambda k,s,e:requested.append((s,e)) or data)
+    result=trend.compare_periods('금리')
+    assert result['available'] is True and result['trend']=='rising'
+    assert result['recent_end']==(yesterday-timedelta(days=1)).isoformat()
+    assert result['past_start']==(yesterday-timedelta(days=14)).isoformat()
+    assert requested==[((yesterday-timedelta(days=14)).isoformat(),yesterday.isoformat())]
+
+
+def test_two_missing_latest_days_stay_unknown(monkeypatch):
+    yesterday=datetime.now(ZoneInfo('Asia/Seoul')).date()-timedelta(days=1)
+    data=[{'period':(yesterday-timedelta(days=15-i)).isoformat(),'ratio':50} for i in range(14)]
+    monkeypatch.setattr(trend,'_request_datalab',lambda *args:data)
+    assert trend.compare_periods('금리')['available'] is False
+
+
+@pytest.mark.parametrize('data',[[],points(0,0),points(30,60)[:7],[{'period':'invalid','ratio':'bad'}]])
+def test_missing_data_is_unknown(monkeypatch,data):
+    monkeypatch.setattr(trend,'_request_datalab',lambda *args:data)
+    result=trend.compare_periods('금리')
+    assert result['trend']=='unknown' and result['recent'] is None
+
+
+def test_client_reads_shared_settings_and_cleans_news(monkeypatch):
+    monkeypatch.setattr(settings,'NAVER_CLIENT_ID','test-id')
+    monkeypatch.setattr(settings,'NAVER_CLIENT_SECRET','test-secret')
+    response=Mock()
+    response.json.return_value={'items':[{'title':'<b>금리</b> &amp; 환율','link':'https://example.com'}]}
+    get=Mock(return_value=response)
+    monkeypatch.setattr(trend.requests,'get',get)
+    assert trend.search_news()[0]['title']=='금리 & 환율'
+    assert get.call_args.args[0]=='https://naverapihub.apigw.ntruss.com/search/v1/news'
+    headers=get.call_args.kwargs['headers']
+    assert headers['X-NCP-APIGW-API-KEY-ID']=='test-id'
+    assert headers['X-NCP-APIGW-API-KEY']=='test-secret'
+    assert 'X-Naver-Client-Id' not in headers and 'X-Naver-Client-Secret' not in headers
+    assert get.call_args.kwargs['timeout']>0
+
+
+def test_datalab_uses_naver_api_hub_search_trend(monkeypatch):
+    monkeypatch.setattr(settings,'NAVER_CLIENT_ID','test-id')
+    monkeypatch.setattr(settings,'NAVER_CLIENT_SECRET','test-secret')
+    response=Mock()
+    response.json.return_value={'results':[{'data':[{'period':'2026-10-01','ratio':50}]}]}
+    post=Mock(return_value=response)
+    monkeypatch.setattr(trend.requests,'post',post)
+    assert trend._request_datalab('금리','2026-09-25','2026-10-08')==[{'period':'2026-10-01','ratio':50}]
+    assert post.call_args.args[0]=='https://naverapihub.apigw.ntruss.com/search-trend/v1/search'
+    headers=post.call_args.kwargs['headers']
+    assert headers['X-NCP-APIGW-API-KEY-ID']=='test-id'
+    assert headers['X-NCP-APIGW-API-KEY']=='test-secret'
+    assert post.call_args.kwargs['json']['keywordGroups']==[{'groupName':'금리','keywords':['금리']}]
+
+
+def test_naver_failure_does_not_log_secrets(monkeypatch,caplog):
+    monkeypatch.setattr(settings,'NAVER_CLIENT_ID','test-id')
+    monkeypatch.setattr(settings,'NAVER_CLIENT_SECRET','do-not-log-this')
+    monkeypatch.setattr(trend.requests,'get',Mock(side_effect=requests.Timeout('do-not-log-this')))
+    assert trend.search_news()==[]
+    assert 'do-not-log-this' not in caplog.text
+
+
+def test_q1_includes_comparison_and_channel_context(monkeypatch):
+    monkeypatch.setattr(trend,'get_hot_issues',lambda *args:[{'title':'금리 뉴스','link':'https://example.com','pub_date':'today'}])
+    monkeypatch.setattr(trend,'compare_periods',lambda k:{'recent':60,'past':30,'trend':'rising','available':True})
+    result=asyncio.run(q1.build_prompt('오늘 주제'))
+    assert '"recent": 60' in result and '과거 업로드' in result
+
+
+def test_q3_extracts_keyword_and_includes_unknown(monkeypatch):
+    compare=Mock(return_value={'recent':None,'past':None,'trend':'unknown','available':False})
+    monkeypatch.setattr(trend,'compare_periods',compare)
+    monkeypatch.setattr(trend,'search_news',lambda *args:[])
+    result=asyncio.run(q3.build_prompt('금리 인하 주제 지금 올려도 돼?'))
+    compare.assert_called_once_with('금리 인하')
+    assert '"available": false' in result and '판단 보류' in result

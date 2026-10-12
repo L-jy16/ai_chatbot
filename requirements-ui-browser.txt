@@ -1,0 +1,2 @@
+-r requirements-ui-dev.txt
+playwright>=1.50,<2
