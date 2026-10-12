@@ -11,13 +11,16 @@ import requests
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-NAVER_NEWS_URL = 'https://openapi.naver.com/v1/search/news.json'
-NAVER_DATALAB_URL = 'https://openapi.naver.com/v1/datalab/search'
+# 네이버 검색·데이터랩 API는 네이버 클라우드 플랫폼의 NAVER API HUB로 이관되었다.
+# 키(Client ID·Secret)는 HUB Application에서 발급하며, 쓰려는 API(뉴스 검색, 검색어 트렌드)를 Application에 켜 두어야 한다.
+NAVER_API_HUB = 'https://naverapihub.apigw.ntruss.com'
+NAVER_NEWS_URL = f'{NAVER_API_HUB}/search/v1/news'
+NAVER_DATALAB_URL = f'{NAVER_API_HUB}/search-trend/v1/search'
 
 
 def _get_headers() -> dict[str, str]:
-    return {'X-Naver-Client-Id': settings.NAVER_CLIENT_ID,
-            'X-Naver-Client-Secret': settings.NAVER_CLIENT_SECRET,
+    return {'X-NCP-APIGW-API-KEY-ID': settings.NAVER_CLIENT_ID,
+            'X-NCP-APIGW-API-KEY': settings.NAVER_CLIENT_SECRET,
             'Content-Type': 'application/json'}
 
 
@@ -72,26 +75,39 @@ def _request_datalab(keyword: str, start_date: str, end_date: str) -> list[dict]
     return values if isinstance(values, list) else []
 
 
-def compare_periods(keyword: str) -> dict:
-    # 아직 완료되지 않은 오늘은 제외. 두 기간을 한 번에 요청하여 동일 척도로 비교한다.
-    end = datetime.now(ZoneInfo('Asia/Seoul')).date() - timedelta(days=1)
+def _period_result(end) -> dict:
     recent_start = end - timedelta(days=6)
     start = end - timedelta(days=13)
-    result = {'recent': None, 'past': None, 'trend': 'unknown', 'available': False,
-              'recent_start': recent_start.isoformat(), 'recent_end': end.isoformat(),
-              'past_start': start.isoformat(), 'past_end': (recent_start - timedelta(days=1)).isoformat()}
+    return {'recent': None, 'past': None, 'trend': 'unknown', 'available': False,
+            'recent_start': recent_start.isoformat(), 'recent_end': end.isoformat(),
+            'past_start': start.isoformat(), 'past_end': (recent_start - timedelta(days=1)).isoformat()}
+
+
+def compare_periods(keyword: str) -> dict:
+    # 아직 완료되지 않은 오늘은 제외. 두 기간을 한 번에 요청하여 동일 척도로 비교한다.
+    # 데이터랩은 전날 수치를 다음 날 늦게 반영하므로(새벽에는 어제 값이 없다) 하루 더 넓게 받아,
+    # 어제 값이 없을 때만 그저께까지의 14일로 비교한다.
+    yesterday = datetime.now(ZoneInfo('Asia/Seoul')).date() - timedelta(days=1)
+    result = _period_result(yesterday)
     if not keyword.strip():
         return result
-    raw = _request_datalab(keyword.strip(), start.isoformat(), end.isoformat())
+    fetch_start = yesterday - timedelta(days=14)
+    raw = _request_datalab(keyword.strip(), fetch_start.isoformat(), yesterday.isoformat())
     by_date = {}
     for item in raw:
         try:
             day = datetime.strptime(item['period'], '%Y-%m-%d').date()
             ratio = float(item['ratio'])
-            if start <= day <= end and math.isfinite(ratio) and 0 <= ratio <= 100:
+            if fetch_start <= day <= yesterday and math.isfinite(ratio) and 0 <= ratio <= 100:
                 by_date[day] = ratio
         except (KeyError, TypeError, ValueError):
             continue
+    end = yesterday if yesterday in by_date else yesterday - timedelta(days=1)
+    if end != yesterday:
+        result = _period_result(end)
+    recent_start = end - timedelta(days=6)
+    start = end - timedelta(days=13)
+    by_date = {d: v for d, v in by_date.items() if start <= d <= end}
     # 누락값을 0으로 지어내지 않는다. 두 7일 구간이 모두 있어야 비교한다.
     if len(by_date) != 14:
         return result

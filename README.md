@@ -99,7 +99,7 @@ if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -D
 
 ## 배포
 
-VM 1대에 uvicorn + systemd로 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속합니다. 전체 절차와 문제 해결은 **[docs/DEPLOY.md](docs/DEPLOY.md)**에 있습니다.
+VM 1대에 uvicorn + systemd로 올려 외부에서 `http://<서버 공인 IP>:8000`으로 접속합니다. 전체 절차와 문제 해결은 **[docs/DEPLOY.md](docs/DEPLOY.md)**에 있습니다. AWS EC2에 Nginx(80) 프록시로 올리는 절차(자동 스크립트 포함)는 **[docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md)**에 있습니다.
 
 ```bash
 sudo apt install -y git python3 python3-venv
@@ -576,6 +576,7 @@ erDiagram
 | [과제 원문](<PDF/미션 - AI 도구 학습 (1).pdf>) | 서비스·문서·로그·배포·협업 요구사항 |
 | [SCENARIOS.md](docs/SCENARIOS.md) | 현재 Q1~Q5 계약, 화면과 프롬프트 파일 대응 |
 | [DEPLOY.md](docs/DEPLOY.md) | Ubuntu VM 설치·systemd·외부 접속·운영 절차 |
+| [DEPLOY-AWS.md](docs/DEPLOY-AWS.md) | AWS EC2 배포(Nginx 80 → uvicorn 127.0.0.1:8000, 보안 그룹 80·22만)·비용·정리 절차 |
 | [auth-design.md](docs/auth-design.md) | A 인증·설정·DB 설계와 개발 당시 계약 |
 | [C_PLAN.md](docs/C_PLAN.md), [C_AGENT_HANDOFF.md](docs/C_AGENT_HANDOFF.md) | C 개발 계획·연동 계약·작업 당시 확인 범위 |
 | [D_HANDOFF.md](docs/D_HANDOFF.md), [D_PR_DRAFTS.md](docs/D_PR_DRAFTS.md) | D 화면·기록 API·데모·검증 이력 |
