@@ -48,3 +48,12 @@ def test_api_docs_account_is_empty_by_default(monkeypatch):
     settings = Settings(_env_file=None)
     assert settings.DOCS_USERNAME == ""
     assert settings.DOCS_PASSWORD == ""
+
+
+def test_admin_account_is_empty_by_default(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    for key in ("ADMIN_USERNAME", "ADMIN_PASSWORD"):
+        monkeypatch.delenv(key, raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.ADMIN_USERNAME == ""
+    assert settings.ADMIN_PASSWORD == ""
