@@ -39,3 +39,12 @@ def test_optional_settings_have_defaults(monkeypatch):
     assert settings.LLM_API_KEY == ""
     assert settings.LLM_MODEL == ""
     assert settings.LLM_TIMEOUT_SECONDS == 50  # gpt-5-mini 추론 응답이 30초를 넘는 경우가 있다
+
+
+def test_api_docs_account_is_empty_by_default(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    for key in ("DOCS_USERNAME", "DOCS_PASSWORD"):
+        monkeypatch.delenv(key, raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.DOCS_USERNAME == ""
+    assert settings.DOCS_PASSWORD == ""
