@@ -7,6 +7,9 @@ os.environ["DATABASE_URL"] = "sqlite://"
 # .env에 실제 키가 있어도 테스트에서 외부 유료 API를 호출하지 않도록 비워 둔다. (환경 변수가 .env보다 우선)
 for key in ("NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "LLM_API_KEY"):
     os.environ[key] = ""
+# 로컬 .env에 운영자 계정(API 문서·DB 조회)이 있어도 테스트 앱은 두 화면을 숨긴 기본 상태로 돈다.
+for key in ("DOCS_USERNAME", "DOCS_PASSWORD", "ADMIN_USERNAME", "ADMIN_PASSWORD"):
+    os.environ[key] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
