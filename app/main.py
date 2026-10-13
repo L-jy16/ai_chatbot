@@ -12,6 +12,7 @@ from app.docs import install_docs
 from app.errors import register_error_handlers
 from app.models.chat import Chat
 from app.routers import auth
+from app.routers.admin import create_admin_router
 from app.routers.chat import create_router
 from app.ui import install_ui
 
@@ -38,6 +39,9 @@ app.add_middleware(
 )
 register_error_handlers(app)
 install_docs(app, settings.DOCS_USERNAME, settings.DOCS_PASSWORD)
+admin_router = create_admin_router(get_db=get_db, username=settings.ADMIN_USERNAME, password=settings.ADMIN_PASSWORD)
+if admin_router is not None:
+    app.include_router(admin_router)
 app.include_router(auth.router)
 app.include_router(create_router(require_login, get_db))
 install_ui(

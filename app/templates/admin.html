@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>DB 조회 · PULSE 운영</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+<main class="page-shell admin">
+  <h1>DB 조회</h1>
+  <p class="admin-note">조회 전용입니다. 이메일은 일부만, 질문은 앞 {{ preview_size }}자만, 답변은 글자 수만 보여 줍니다. 시각은 UTC입니다.</p>
+
+  <section aria-labelledby="summary-title">
+    <h2 id="summary-title">요약</h2>
+    <table class="admin-table">
+      <tbody>
+        <tr><th scope="row">사용자</th><td>{{ summary.users }}</td></tr>
+        <tr><th scope="row">대화 전체</th><td>{{ summary.chats }}</td></tr>
+        <tr><th scope="row">최근 24시간 대화</th><td>{{ summary.chats_24h }}</td></tr>
+        {% for name, count in summary.by_status.items() %}
+        <tr><th scope="row">상태 {{ name }}</th><td>{{ count }}</td></tr>
+        {% endfor %}
+        {% for name, count in summary.by_mode.items() %}
+        <tr><th scope="row">모드 {{ name }}</th><td>{{ count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="chats-title">
+    <h2 id="chats-title">최근 대화</h2>
+    <form class="admin-filter" method="get" action="/admin">
+      <label>상태
+        <select name="status">
+          <option value="">전체</option>
+          {% for name in statuses %}
+          <option value="{{ name }}" {% if name == status %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>개수 <input type="number" name="limit" min="1" max="200" value="{{ limit }}"></label>
+      <button type="submit">보기</button>
+    </form>
+    <table class="admin-table">
+      <thead>
+        <tr><th>번호</th><th>시각</th><th>사용자</th><th>모드</th><th>상태</th><th>질문</th><th>답변 글자 수</th></tr>
+      </thead>
+      <tbody>
+        {% for chat in chats %}
+        <tr>
+          <td>{{ chat.id }}</td>
+          <td>{{ chat.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ chat.user }}</td>
+          <td>{{ chat.mode }}</td>
+          <td class="status-{{ chat.status }}">{{ chat.status }}</td>
+          <td>{{ chat.question }}</td>
+          <td>{{ chat.answer_length }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">기록이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="users-title">
+    <h2 id="users-title">최근 가입자</h2>
+    <table class="admin-table">
+      <thead><tr><th>번호</th><th>이메일</th><th>가입 시각</th></tr></thead>
+      <tbody>
+        {% for user in users %}
+        <tr><td>{{ user.id }}</td><td>{{ user.email }}</td><td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">기록이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

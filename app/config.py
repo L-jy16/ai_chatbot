@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # A: API 문서(/docs, /redoc, /openapi.json) 접속 계정. 둘 다 있어야 문서가 열린다.
     DOCS_USERNAME: str = ""
     DOCS_PASSWORD: str = ""
+    # A: 운영자 DB 조회 화면(/admin) 접속 계정. 둘 다 있어야 화면이 열린다.
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD: str = ""
 
 
 settings = Settings()

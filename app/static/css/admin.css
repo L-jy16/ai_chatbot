@@ -1,0 +1,11 @@
+/* 운영자 DB 조회 화면(/admin) 전용. 공용 style.css 위에 표 모양만 더한다. */
+.admin section { margin-top: 2rem; }
+.admin-note { color: #555; font-size: 0.9rem; }
+.admin-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.admin-table th, .admin-table td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+.admin-table thead th, .admin-table tbody th { background: #f6f6f6; white-space: nowrap; }
+.admin-table td:first-child { white-space: nowrap; }
+.admin-filter { display: flex; gap: 0.75rem; align-items: end; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.admin-filter input { width: 6rem; }
+.status-timeout { color: #a15c00; }
+.status-error { color: #b42318; }
