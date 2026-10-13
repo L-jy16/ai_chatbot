@@ -128,6 +128,7 @@ curl http://<서버 공인 IP>:8000/health         # 보안 그룹·ufw에서 TC
 | `LLM_MODEL` | `.env.example`은 `gpt-5-mini`, 값이 비어 있어도 클라이언트가 같은 모델 사용 |
 | `LLM_TIMEOUT_SECONDS` | httpx 연결·읽기·쓰기·풀 대기 타임아웃, 기본 50초; 전체 채팅 처리 시간의 상한은 아님 |
 | `DOCS_USERNAME`, `DOCS_PASSWORD` | API 문서 접속 계정(HTTP Basic, 영문·숫자·기호). 둘 다 있어야 `/docs` 등이 열리고, 비우면 404로 숨김 |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | 운영자 DB 조회 화면 `/admin` 접속 계정(HTTP Basic). 둘 다 있어야 열리고, 비우면 404로 숨김 |
 
 앱은 실행 폴더의 `.env`를 읽습니다. Codyssey 키로 네이버 API를 조회할 수는 없으며 두 인증은 별개입니다. AI 클라이언트는 [OpenAI Chat Completions 명세](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 형식으로 설정된 게이트웨이에 요청합니다.
 
@@ -358,6 +359,8 @@ erDiagram
 | GET | `/health` | 불필요 | 서버 상태 `{"status":"ok"}`, 200 |
 
 화면 경로는 `/signup`, `/login`, `/`(채팅), `/history`(내 기록)이며, 비로그인 사용자의 채팅·기록 페이지 접근은 `/login`으로 303 리다이렉트합니다. API 문서는 `/docs`(Swagger UI)·`/redoc`에서 확인합니다. 외부에 API 목록과 스키마가 공개되지 않도록 `.env`에 `DOCS_USERNAME`·`DOCS_PASSWORD`를 둘 다 설정했을 때만 열리고, 브라우저 로그인 창으로 계정을 묻습니다. 설정하지 않으면 세 경로(`/docs`, `/redoc`, `/openapi.json`) 모두 404입니다.
+
+운영자는 `/admin`에서 DB를 조회합니다. `ADMIN_USERNAME`·`ADMIN_PASSWORD`를 설정했을 때만 열리고(브라우저 로그인 창), 조회만 할 수 있습니다. 사용자·대화 수와 상태·모드별 수, 최근 24시간 대화 수, 최근 대화(최신순, `?status=success|timeout|error`, `?limit=1~200`), 최근 가입자 10명을 보여 줍니다. 개인정보를 줄이려고 이메일은 앞 두 글자만, 질문은 앞 80자만, 답변은 글자 수만 표시합니다.
 
 ### 회원가입·로그인
 
