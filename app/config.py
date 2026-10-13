@@ -23,5 +23,9 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "https://copa.codyssey.kr/v1"
     LLM_TIMEOUT_SECONDS: float = Field(default=50, gt=0)  # 추론 모델 응답 여유, 브라우저 제한(65초)보다 짧게
 
+    # A: API 문서(/docs, /redoc, /openapi.json) 접속 계정. 둘 다 있어야 문서가 열린다.
+    DOCS_USERNAME: str = ""
+    DOCS_PASSWORD: str = ""
+
 
 settings = Settings()
